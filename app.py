@@ -2008,21 +2008,48 @@ def inject_loading_animation():
         var overlay = document.getElementById('pcc-loader');
         if (!overlay) return;
 
+        var hideTimer = null;
+
+        function show() {{
+            if (hideTimer) {{ clearTimeout(hideTimer); hideTimer = null; }}
+            overlay.style.display = 'flex';
+        }}
+        function hide() {{
+            // Pequeño delay para evitar parpadeos en transiciones rápidas
+            hideTimer = setTimeout(function() {{
+                overlay.style.display = 'none';
+            }}, 150);
+        }}
+
         function check() {{
-            // Detectar spinner nativo O estado "running" de Streamlit
+            // 1. Spinner explícito (st.cache_data show_spinner, st.spinner)
             var hasSpinner = document.querySelector(
                 '[data-testid="stSpinnerContainer"], [data-testid="stSpinner"]'
             );
-            var isRunning = document.querySelector(
-                '[data-testid="stStatusWidget"] svg, .stStatusRunning'
+            // 2. Estado "stale": Streamlit pone data-stale="true" en los elementos
+            //    mientras está recalculando el script (es el estado del grisado)
+            var isStale = document.querySelector('[data-stale="true"]');
+            // 3. Indicador de "Running" en la toolbar de Streamlit
+            var statusRunning = document.querySelector(
+                '[data-testid="stStatusWidget"][aria-label="Running"],' +
+                '[data-testid="stToolbarActions"] [aria-label="Stop"]'
             );
-            overlay.style.display = (hasSpinner || isRunning) ? 'flex' : 'none';
+
+            if (hasSpinner || isStale || statusRunning) {{
+                show();
+            }} else {{
+                hide();
+            }}
         }}
 
-        // Observar cambios en el DOM para detectar aparición/desaparición del spinner
+        // Observar cambios de DOM y de atributos (para capturar data-stale)
         new MutationObserver(check).observe(document.body, {{
-            childList: true, subtree: true, attributes: true
+            childList: true, subtree: true,
+            attributes: true, attributeFilter: ['data-stale', 'aria-label']
         }});
+
+        // Verificar estado inicial
+        check();
     }})();
     </script>
     """, unsafe_allow_html=True)
