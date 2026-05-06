@@ -1115,19 +1115,6 @@ def render_resumen(inspecciones):
 # ══════════════════════════════════════════════════════════════════════════════
 
 def render_cips_dashboard(d):
-    st.markdown(f"""
-    <div class="main-header">
-      <div class="main-header-title">
-        Procesamiento CIPS
-        <span style="color:#64748B;font-weight:400;margin-left:0.4rem;">| {linea or '—'}</span>
-      </div>
-      <div class="main-header-meta">
-        {cliente} · {distrito} · Corriente Interrumpida
-      </div>
-    </div>
-    """, unsafe_allow_html=True)
-
-    # ── Carga de archivos y parámetros ────────────────────────────────────────
     df_raw = d["df"].copy()
     tramo  = d["tramo"]
     fecha  = d["fecha"]
