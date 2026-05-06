@@ -428,9 +428,9 @@ components.html("""
 # ══════════════════════════════════════════════════════════════════════════════
 
 CIPS_COLORS = {
-    "PROTEGIDO":      "#1565C0",
-    "DESPROTEGIDO":   "#C62828",
-    "SOBREPROTEGIDO": "#0D47A1",
+    "PROTEGIDO":      "#374151",   # gris oscuro — estado OK
+    "DESPROTEGIDO":   "#D50032",   # rojo institucional — crítico
+    "SOBREPROTEGIDO": "#7F1D1D",   # rojo oscuro — advertencia
 }
 
 
@@ -1170,30 +1170,30 @@ def render_cips_dashboard(d):
 
     # ── Header ─────────────────────────────────────────────────────────────────
     st.markdown(f"""
-    <div style="background:linear-gradient(135deg,#0D47A1 0%,#1565C0 60%,#1976D2 100%);
-                padding:1.4rem 2rem;border-radius:14px;margin-bottom:1.2rem;
-                box-shadow:0 8px 28px -6px rgba(13,71,161,0.4);
+    <div style="background:white;border:1px solid #E2E8F0;border-left:5px solid #D50032;
+                padding:1.2rem 1.8rem;border-radius:12px;margin-bottom:1.2rem;
+                box-shadow:0 4px 16px -4px rgba(0,0,0,0.06);
                 display:flex;align-items:center;justify-content:space-between;">
       <div>
-        <div style="font-size:0.72rem;color:rgba(255,255,255,0.65);font-weight:700;
+        <div style="font-size:0.7rem;color:#D50032;font-weight:700;
                     text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px;">
           Inspección CIPS
         </div>
-        <div style="font-size:1.35rem;font-weight:800;color:white;letter-spacing:-0.02em;">
+        <div style="font-size:1.3rem;font-weight:800;color:#0F172A;letter-spacing:-0.02em;">
           {tramo}
         </div>
-        <div style="font-size:0.85rem;color:rgba(255,255,255,0.75);margin-top:4px;">
+        <div style="font-size:0.85rem;color:#64748B;margin-top:4px;">
           {fecha} &nbsp;·&nbsp; {total:,} puntos medidos
         </div>
       </div>
-      <div style="display:flex;gap:1.5rem;text-align:center;">
-        <div style="background:rgba(255,255,255,0.12);border-radius:10px;padding:0.7rem 1.1rem;">
-          <div style="font-size:1.5rem;font-weight:800;color:white;">{pct_p}</div>
-          <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.08em;">Protegido</div>
+      <div style="display:flex;gap:1.2rem;text-align:center;">
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:0.65rem 1.1rem;">
+          <div style="font-size:1.4rem;font-weight:800;color:#374151;">{pct_p}</div>
+          <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">Protegido</div>
         </div>
-        <div style="background:rgba(213,0,50,0.25);border-radius:10px;padding:0.7rem 1.1rem;">
-          <div style="font-size:1.5rem;font-weight:800;color:#FF8A80;">{pct_d}</div>
-          <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.08em;">Desprotegido</div>
+        <div style="background:#FFF5F6;border:1px solid #FECDD3;border-radius:10px;padding:0.65rem 1.1rem;">
+          <div style="font-size:1.4rem;font-weight:800;color:#D50032;">{pct_d}</div>
+          <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">Desprotegido</div>
         </div>
       </div>
     </div>
@@ -1202,9 +1202,9 @@ def render_cips_dashboard(d):
     # ── KPI row ────────────────────────────────────────────────────────────────
     animated_kpi_row([
         ("Total puntos",     total,   "#0F172A"),
-        ("Protegidos",       n_prot,  CIPS_COLORS["PROTEGIDO"]),
-        ("Desprotegidos",    n_desp,  CIPS_COLORS["DESPROTEGIDO"]),
-        ("Sobreprotegidos",  n_sobre, CIPS_COLORS["SOBREPROTEGIDO"]),
+        ("Protegidos",       n_prot,  "#374151"),
+        ("Desprotegidos",    n_desp,  "#D50032"),
+        ("Sobreprotegidos",  n_sobre, "#7F1D1D"),
     ])
 
     # ── Leer filtros ANTES de renderizar tabla y mapa ──────────────────────────
@@ -1363,32 +1363,32 @@ def render_cips_dashboard(d):
             fig.add_trace(go.Scatter(
                 x=sub[pk_col], y=sub["On_mV_limpio"],
                 mode="lines", name="On mV",
-                line=dict(color="#90CAF9", width=1.4),
-                fill="tozeroy", fillcolor="rgba(144,202,249,0.06)"))
+                line=dict(color="#9CA3AF", width=1.4),
+                fill="tozeroy", fillcolor="rgba(156,163,175,0.05)"))
 
         if "Off_mV_limpio" in sub.columns:
             fig.add_trace(go.Scatter(
                 x=sub[pk_col], y=sub["Off_mV_limpio"],
                 mode="lines", name="Off mV",
-                line=dict(color="#1565C0", width=2.0)))
+                line=dict(color="#D50032", width=2.0)))
 
         # Zona protegida sombreada
         fig.add_hrect(y0=-1200, y1=-850,
-                      fillcolor="rgba(21,101,192,0.06)", line_width=0,
+                      fillcolor="rgba(55,65,81,0.05)", line_width=0,
                       annotation_text="Zona protegida",
                       annotation_position="top left",
-                      annotation_font=dict(size=9, color="#1565C0"))
+                      annotation_font=dict(size=9, color="#374151"))
 
         fig.add_hline(y=-850,
-                      line=dict(color="#42A5F5", dash="dash", width=1.3),
+                      line=dict(color="#6B7280", dash="dash", width=1.3),
                       annotation_text="-850 mV",
                       annotation_position="top right",
-                      annotation_font=dict(size=9, color="#42A5F5"))
+                      annotation_font=dict(size=9, color="#6B7280"))
         fig.add_hline(y=-1200,
-                      line=dict(color="#EF5350", dash="dash", width=1.3),
+                      line=dict(color="#D50032", dash="dash", width=1.3),
                       annotation_text="-1.200 mV",
                       annotation_position="bottom right",
-                      annotation_font=dict(size=9, color="#EF5350"))
+                      annotation_font=dict(size=9, color="#D50032"))
 
         fig.update_layout(
             **CHART, height=340,
