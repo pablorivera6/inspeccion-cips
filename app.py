@@ -435,10 +435,47 @@ CIPS_COLORS = {
 
 
 def load_cips_processed(file):
-    """Carga un Excel CIPS ya procesado (hoja Survey Data)."""
+    """Carga un Excel CIPS (procesado o crudo de FastField)."""
     df = pd.read_excel(file, sheet_name="Survey Data")
     nombre = getattr(file, "name", str(file))
-    parts  = nombre.replace(".xlsx", "").split("_")
+
+    # ── Normalizar columnas crudas de FastField → nombres del dashboard ───────
+    RENAME = {
+        "Dist From Start":          "PK_geom_m",
+        "On Voltage":               "On_mV_limpio",   # se convierte abajo
+        "Off Voltage":              "Off_mV_limpio",
+        "Latitude":                 "Lat_corr",
+        "Longitude":                "Long_corr",
+        "Comment":                  "Comentario",
+        "DCP/Feature/DCVG Anomaly": "Anomalia",
+    }
+    for src, dst in RENAME.items():
+        if src in df.columns and dst not in df.columns:
+            df = df.rename(columns={src: dst})
+
+    # Convertir voltios → milivoltios si el rango sugiere que son V
+    for col in ["On_mV_limpio", "Off_mV_limpio"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            if df[col].dropna().abs().median() < 5:   # valores en V, no mV
+                df[col] = df[col] * 1000
+
+    # Calcular Estado_CP si no está
+    if "Estado_CP" not in df.columns and "Off_mV_limpio" in df.columns:
+        def _estado(v):
+            if pd.isna(v):     return "DESPROTEGIDO"
+            if v <= -1200:     return "SOBREPROTEGIDO"
+            if v <= -850:      return "PROTEGIDO"
+            return "DESPROTEGIDO"
+        df["Estado_CP"] = df["Off_mV_limpio"].apply(_estado)
+
+    # Limpiar coordenadas
+    for c in ["Lat_corr", "Long_corr"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    # Metadata desde nombre del archivo
+    parts = nombre.replace(".xlsx", "").split("_")
     if len(parts) >= 3 and parts[0].upper() == "CIPS":
         fecha_raw = parts[-2] if len(parts) > 2 else ""
         try:
@@ -450,6 +487,7 @@ def load_cips_processed(file):
     else:
         tramo = nombre.replace(".xlsx", "")
         fecha = "—"
+
     return {"df": df, "tramo": tramo.replace("_", " "), "fecha": fecha,
             "filename": nombre, "tipo": "CIPS"}
 
