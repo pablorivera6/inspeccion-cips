@@ -424,52 +424,34 @@ components.html("""
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CIPS — Configuración y estado
+# CIPS — Colores y carga de datos procesados
 # ══════════════════════════════════════════════════════════════════════════════
 
-def _rp(rel):
-    base = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
-    return os.path.join(base, rel)
-
-EXCEL_INFRA = _rp(os.path.join("data", "Listado de Infraestructura para Cod Informes.xlsx"))
-SHAPEFILES  = _rp("shapefiles")
-
-for _k, _v in {
-    "cips_res_df": None, "cips_res_bytes": None, "cips_res_name": None,
-    "cips_sp_url": None,
-}.items():
-    if _k not in st.session_state:
-        st.session_state[_k] = _v
+CIPS_COLORS = {
+    "PROTEGIDO":      "#1565C0",
+    "DESPROTEGIDO":   "#C62828",
+    "SOBREPROTEGIDO": "#0D47A1",
+}
 
 
-@st.cache_data(ttl=0)
-def cargar_infra():
-    return pd.read_excel(EXCEL_INFRA)
-
-
-def get_shp(distrito, linea):
-    if not linea:
-        return None
-    try:
-        df_lineas = cargar_infra()
-        fila = df_lineas[(df_lineas["DISTRITO"] == distrito) & (df_lineas["TRAMO"] == linea)]
-        if fila.empty:
-            return None
-        return os.path.join(SHAPEFILES, fila["ID TRAMO"].values[0] + ".shp")
-    except Exception:
-        return None
-
-
-def _get_sp_token():
-    """Token de cliente (sin login de usuario) para operaciones de escritura en SharePoint."""
-    cfg = st.secrets.get("sharepoint", {})
-    app_obj = msal.ConfidentialClientApplication(
-        cfg["client_id"],
-        authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
-        client_credential=cfg["client_secret"],
-    )
-    result = app_obj.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
-    return result.get("access_token")
+def load_cips_processed(file):
+    """Carga un Excel CIPS ya procesado (hoja Survey Data)."""
+    df = pd.read_excel(file, sheet_name="Survey Data")
+    nombre = getattr(file, "name", str(file))
+    parts  = nombre.replace(".xlsx", "").split("_")
+    if len(parts) >= 3 and parts[0].upper() == "CIPS":
+        fecha_raw = parts[-2] if len(parts) > 2 else ""
+        try:
+            fecha = datetime.datetime.strptime(fecha_raw, "%Y%m%d").strftime("%d/%m/%Y")
+            tramo = " ".join(parts[1:-2])
+        except Exception:
+            fecha = "—"
+            tramo = " ".join(parts[1:])
+    else:
+        tramo = nombre.replace(".xlsx", "")
+        fecha = "—"
+    return {"df": df, "tramo": tramo.replace("_", " "), "fecha": fecha,
+            "filename": nombre, "tipo": "CIPS"}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1129,14 +1111,10 @@ def render_resumen(inspecciones):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# CIPS — Dashboard de procesamiento
+# CIPS — Dashboard histórico (estilo Power BI)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def render_cips(distrito, linea, cliente, sp_files=None):
-    shp    = get_shp(distrito, linea)
-    shp_ok = bool(shp and os.path.exists(shp))
-    sp_files = sp_files or []
-
+def render_cips_dashboard(d):
     st.markdown(f"""
     <div class="main-header">
       <div class="main-header-title">
@@ -1150,275 +1128,144 @@ def render_cips(distrito, linea, cliente, sp_files=None):
     """, unsafe_allow_html=True)
 
     # ── Carga de archivos y parámetros ────────────────────────────────────────
-    col_up, col_param = st.columns([3, 2])
+    df_raw = d["df"].copy()
+    tramo  = d["tramo"]
+    fecha  = d["fecha"]
+    total  = len(df_raw)
 
-    with col_up:
-        st.markdown('<div class="bloque"><div class="bloque-titulo">Archivos de inspección</div>', unsafe_allow_html=True)
+    pk_col = next((c for c in ["PK_geom_m","PK_real_m"] if c in df_raw.columns), None)
+    if pk_col:
+        df_raw[pk_col] = pd.to_numeric(df_raw[pk_col], errors="coerce")
 
-        # Archivos desde SharePoint (ya sincronizados)
-        if sp_files:
-            st.markdown(
-                f'<p style="font-size:0.82rem;color:#1B5E20;font-weight:600;margin-bottom:6px;">'
-                f'SharePoint — {len(sp_files)} archivo(s) sincronizado(s):</p>',
-                unsafe_allow_html=True
+    # ── Cabecera ───────────────────────────────────────────────────────────────
+    n_prot  = int((df_raw["Estado_CP"]=="PROTEGIDO").sum())      if "Estado_CP" in df_raw.columns else 0
+    n_desp  = int((df_raw["Estado_CP"]=="DESPROTEGIDO").sum())   if "Estado_CP" in df_raw.columns else 0
+    n_sobre = int((df_raw["Estado_CP"]=="SOBREPROTEGIDO").sum()) if "Estado_CP" in df_raw.columns else 0
+
+    st.markdown(f"""
+    <div class="main-header">
+      <div class="main-header-title">
+        Dashboard CIPS <span style="color:#64748B;font-weight:400;margin-left:0.4rem;">| {tramo}</span>
+      </div>
+      <div class="main-header-meta">
+        {fecha} • <b style="color:#0F172A;">{total:,} puntos</b>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ── Filtros (leemos primero para aplicarlos antes de renderizar) ───────────
+    col_tbl, col_map, col_right = st.columns([0.95, 1.85, 1.0])
+
+    with col_right:
+        pbi_title("Filtros")
+        if "Estado_CP" in df_raw.columns:
+            estados_disp = sorted(df_raw["Estado_CP"].dropna().unique().tolist())
+            est_sel = st.multiselect("Estado CP", estados_disp, default=estados_disp,
+                                     key=f"cips_est_{d['filename']}")
+        else:
+            est_sel = []
+
+        pk_min = float(df_raw[pk_col].min()) if pk_col and df_raw[pk_col].notna().any() else 0.0
+        pk_max = float(df_raw[pk_col].max()) if pk_col and df_raw[pk_col].notna().any() else 1.0
+        if pk_col and pk_max > pk_min:
+            pk_sel = st.slider("PK (m)", pk_min, pk_max, (pk_min, pk_max),
+                               format="%.0f", key=f"cips_pk_{d['filename']}")
+        else:
+            pk_sel = (pk_min, pk_max)
+
+    # Aplicar filtros
+    df = df_raw.copy()
+    if est_sel and "Estado_CP" in df.columns:
+        df = df[df["Estado_CP"].isin(est_sel)]
+    if pk_col:
+        df = df[(df[pk_col] >= pk_sel[0]) & (df[pk_col] <= pk_sel[1])]
+
+    # ── Tabla ──────────────────────────────────────────────────────────────────
+    with col_tbl:
+        pbi_title("Datos de medición")
+        show = [c for c in [pk_col, "On_mV_limpio", "Off_mV_limpio", "Estado_CP", "IR_Drop_mV_limpio"]
+                if c and c in df.columns]
+
+        def color_estado(val):
+            c = CIPS_COLORS.get(str(val), "")
+            return f"color: {c}; font-weight:600;" if c else ""
+
+        if "Estado_CP" in df.columns:
+            styled = df[show].reset_index(drop=True).style.applymap(
+                color_estado, subset=["Estado_CP"])
+            st.dataframe(styled, use_container_width=True, height=400, hide_index=True)
+        else:
+            st.dataframe(df[show].reset_index(drop=True),
+                         use_container_width=True, height=400, hide_index=True)
+
+    # ── Mapa ───────────────────────────────────────────────────────────────────
+    with col_map:
+        pbi_title("Distribución geográfica")
+        lat_c = "Lat_corr" if "Lat_corr" in df.columns else "Lat"
+        lon_c = "Long_corr" if "Long_corr" in df.columns else "Long"
+        mdf   = df.dropna(subset=[lat_c, lon_c]) if lat_c in df.columns else pd.DataFrame()
+        if not mdf.empty:
+            hover_d = {}
+            if pk_col:        hover_d[pk_col]         = True
+            if "Off_mV_limpio" in mdf.columns: hover_d["Off_mV_limpio"] = True
+            if lat_c in mdf.columns:  hover_d[lat_c]  = False
+            if lon_c in mdf.columns:  hover_d[lon_c]  = False
+            fig = px.scatter_mapbox(
+                mdf, lat=lat_c, lon=lon_c,
+                color="Estado_CP" if "Estado_CP" in mdf.columns else None,
+                color_discrete_map=CIPS_COLORS,
+                hover_data=hover_d,
+                zoom=10, height=400, mapbox_style="open-street-map",
             )
-            for f in sp_files:
-                st.markdown(
-                    f'<div style="background:#F0FFF4;border:1px solid #C6F6D5;border-radius:6px;'
-                    f'padding:0.35rem 0.7rem;margin:3px 0;font-size:0.8rem;color:#22543D;">'
-                    f'{f.name}</div>',
-                    unsafe_allow_html=True
-                )
-            st.markdown('<p style="font-size:0.78rem;color:#64748B;margin-top:8px;">O sube archivos adicionales:</p>',
-                        unsafe_allow_html=True)
+            fig.update_traces(marker=dict(size=5, opacity=0.9))
+            fig.update_layout(margin=dict(t=0,b=0,l=0,r=0),
+                               legend=dict(x=0.01,y=0.99,
+                                           bgcolor="rgba(255,255,255,0.9)",
+                                           borderwidth=1, font_size=10))
+            st.plotly_chart(fig, use_container_width=True)
         else:
-            st.markdown('<p style="font-size:0.82rem;color:#64748B;margin-bottom:6px;">Sube los archivos Excel de la inspección:</p>',
-                        unsafe_allow_html=True)
+            st.info("Sin coordenadas GPS en los datos.")
 
-        archivos_subidos = st.file_uploader(
-            "Archivos Excel CIPS",
-            type=["xlsx"], accept_multiple_files=True, label_visibility="collapsed",
-            key="cips_uploader"
-        )
+    # ── Donut en col_right (continúa) ──────────────────────────────────────────
+    with col_right:
+        if "Estado_CP" in df_raw.columns:
+            est_df = df_raw["Estado_CP"].value_counts().reset_index()
+            est_df.columns = ["Estado_CP","Count"]
+            fig = px.pie(est_df, values="Count", names="Estado_CP",
+                         color="Estado_CP", color_discrete_map=CIPS_COLORS, hole=0.5)
+            fig.update_layout(height=230, margin=dict(t=8,b=0,l=0,r=0),
+                               paper_bgcolor="white",
+                               legend=dict(font_size=10, orientation="v"))
+            fig.update_traces(textposition="inside", textinfo="percent",
+                               hovertemplate="%{label}<br>%{value} pts<extra></extra>")
+            st.plotly_chart(fig, use_container_width=True)
 
-        # Combinar SP + subidos (evitar duplicados por nombre)
-        nombres_vistos = {f.name for f in sp_files}
-        archivos_extra = []
-        invalidos = []
-        for a in (archivos_subidos or []):
-            if a.name in nombres_vistos:
-                continue
-            nombres_vistos.add(a.name)
-            try:
-                if "Survey Data" in pd.ExcelFile(a).sheet_names:
-                    archivos_extra.append(a)
-                else:
-                    invalidos.append(a.name)
-            except:
-                invalidos.append(a.name)
-        if archivos_extra:
-            st.success(f"{len(archivos_extra)} archivo(s) adicional(es) válido(s): {', '.join(a.name for a in archivos_extra)}")
-        if invalidos:
-            st.warning(f"Sin hoja 'Survey Data' (ignorados): {', '.join(invalidos)}")
-
-        archivos = sp_files + archivos_extra
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    with col_param:
-        linea_display = linea if linea else "—"
-        shp_label  = "Encontrado" if shp_ok else "No encontrado"
-        n_archivos = len(archivos)
-        sp_sync    = f"{len(sp_files)} de SP" if sp_files else "manual"
-        _p = '<p style="margin:0.4rem 0;color:#1a1a1a">'
-        rows_html = [f'{_p}<b>Cliente:</b> {cliente}</p>']
-        if cliente == "TGI":
-            rows_html.append(f'{_p}<b>Distrito:</b> {distrito}</p>')
-        rows_html += [
-            f'{_p}<b>Tramo:</b> {linea_display}</p>',
-            f'{_p}<b>Shapefile:</b> {"✅" if shp_ok else "❌"} {shp_label}</p>',
-            f'{_p}<b>Archivos:</b> {n_archivos} ({sp_sync})</p>',
-        ]
-        st.html(
-            '<div class="bloque"><div class="bloque-titulo">Parámetros</div>'
-            + "".join(rows_html) + "</div>"
-        )
-
-    # ── Botón procesar ─────────────────────────────────────────────────────────
-    st.write("")
-    _, col_btn, _ = st.columns([2, 1, 2])
-    with col_btn:
-        procesar = st.button("Procesar inspección", use_container_width=True)
-
-    if procesar:
-        archivos_validos = archivos
-        if not archivos_validos:
-            st.error("Sube al menos un archivo Excel con hoja 'Survey Data' antes de procesar.")
-        elif not shp_ok:
-            st.error(f"No se encontró el shapefile para el tramo **{linea}**. Verifica que el tramo esté en la lista de infraestructura.")
-        else:
-            st.session_state.cips_res_df = st.session_state.cips_res_bytes = st.session_state.cips_res_name = None
-            st.session_state.cips_sp_url = None
-
-            prog   = st.progress(0)
-            estado = st.empty()
-
-            def upd(p, msg):
-                prog.progress(p, text=msg)
-                estado.caption(msg)
-
-            _ok = False
-            with tempfile.TemporaryDirectory() as tmp:
-                for a in archivos_validos:
-                    a.seek(0)
-                    with open(os.path.join(tmp, a.name), "wb") as f:
-                        f.write(a.read())
-                try:
-                    upd(15, "Unificando archivos...")
-                    from mod_unificar import ejecutar_unificar
-                    unif = ejecutar_unificar(tmp)
-
-                    upd(55, "Calculando PK geométrico (LRS)...")
-                    from mod_cips_lrs import ejecutar_cips_lrs
-                    salida = ejecutar_cips_lrs(tmp, unif, shp)
-
-                    upd(85, "Cargando resultados...")
-                    df_res = pd.read_excel(salida, sheet_name="Survey Data")
-                    with open(salida, "rb") as f:
-                        xbytes = f.read()
-
-                    ts     = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                    nombre = f"CIPS_{(linea or 'SIN_TRAMO').replace(' ','_')}_{ts}.xlsx"
-
-                    st.session_state.cips_res_df    = df_res
-                    st.session_state.cips_res_bytes = xbytes
-                    st.session_state.cips_res_name  = nombre
-
-                    upd(92, "Subiendo a SharePoint...")
-                    try:
-                        from mod_cips_sharepoint import subir_a_sharepoint
-                        tok = _get_sp_token()
-                        if tok:
-                            tmp_sp = os.path.join(tmp, nombre)
-                            with open(tmp_sp, "wb") as f:
-                                f.write(xbytes)
-                            sub = f"ocensa/{linea.replace(' ','_')}" if cliente == "OCENSA" \
-                                  else datetime.datetime.now().strftime("%Y/%m")
-                            url = subir_a_sharepoint(tmp_sp, tok, subcarpeta=sub)
-                            st.session_state.cips_sp_url = url
-                    except Exception as e_sp:
-                        st.warning(f"Procesado OK, pero no se pudo subir a SharePoint: {e_sp}")
-
-                    upd(100, "¡Proceso completado!")
-                    _ok = True
-
-                except Exception as e:
-                    import traceback
-                    prog.empty(); estado.empty()
-                    st.error(f"Error en el procesamiento: {e}")
-                    with st.expander("Ver detalle del error"):
-                        st.code(traceback.format_exc())
-
-            if _ok:
-                prog.empty(); estado.empty()
-                st.rerun()
-
-    # ── Resultados ─────────────────────────────────────────────────────────────
-    if st.session_state.cips_res_df is not None:
-        df = st.session_state.cips_res_df
-        divider()
-        pbi_title("Resultados del procesamiento CIPS")
-
-        total = len(df)
-        prot  = int((df["Estado_CP"] == "PROTEGIDO").sum())   if "Estado_CP" in df.columns else 0
-        desp  = int((df["Estado_CP"] == "DESPROTEGIDO").sum()) if "Estado_CP" in df.columns else 0
-        sobre = int((df["Estado_CP"] == "SOBREPROTEGIDO").sum()) if "Estado_CP" in df.columns else 0
-        pct   = f"{round(prot/total*100,1)}%" if total else "—"
-
-        animated_kpi_row([
-            ("Puntos totales",   total, "#0F172A"),
-            ("Protegidos",       prot,  C_PROT),
-            ("Desprotegidos",    desp,  C_SIN),
-            ("Sobreprotegidos",  sobre, C_SOBRE),
-        ])
-
-        # Gráfica Off mV vs PK
-        if "Off_mV_limpio" in df.columns and "PK_real_m" in df.columns:
-            divider()
-            pbi_title("Potencial OFF (mV) por PK")
-            sub = df.dropna(subset=["PK_real_m","Off_mV_limpio"]).copy()
-            fig = go.Figure()
+    # ── Gráfica On/Off vs PK (full width) ──────────────────────────────────────
+    divider()
+    pbi_title("On_mV_limpio y Off_mV_limpio por PK")
+    if pk_col and ("On_mV_limpio" in df.columns or "Off_mV_limpio" in df.columns):
+        sub = df.dropna(subset=[pk_col]).sort_values(pk_col)
+        fig = go.Figure()
+        if "On_mV_limpio" in sub.columns:
             fig.add_trace(go.Scatter(
-                x=sub["PK_real_m"], y=sub["Off_mV_limpio"],
-                mode="lines+markers", name="Off mV",
-                line=dict(color=C_PROT, width=1.8), marker=dict(size=4)
-            ))
-            fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(21,101,192,0.05)", line_width=0)
-            fig.add_hline(y=-850,  line=dict(color="#64B5F6", dash="dash", width=1.2),
-                          annotation_text="-850", annotation_position="top left",
-                          annotation_font=dict(size=9, color="#64B5F6"))
-            fig.add_hline(y=-1200, line=dict(color="#EF5350", dash="dash", width=1.2),
-                          annotation_text="-1200", annotation_position="top left",
-                          annotation_font=dict(size=9, color="#EF5350"))
-            st.plotly_chart(apply_chart(fig, 300, "PK (m)", "mV"), use_container_width=True)
+                x=sub[pk_col], y=sub["On_mV_limpio"],
+                mode="lines", name="On mV",
+                line=dict(color="#64B5F6", width=1.5)))
+        if "Off_mV_limpio" in sub.columns:
+            fig.add_trace(go.Scatter(
+                x=sub[pk_col], y=sub["Off_mV_limpio"],
+                mode="lines", name="Off mV",
+                line=dict(color="#0D47A1", width=1.8)))
+        fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(21,101,192,0.04)", line_width=0)
+        fig.add_hline(y=-850,  line=dict(color="#42A5F5", dash="dash", width=1.2),
+                      annotation_text="-850 mV", annotation_position="top right",
+                      annotation_font=dict(size=9, color="#42A5F5"))
+        fig.add_hline(y=-1200, line=dict(color="#EF5350", dash="dash", width=1.2),
+                      annotation_text="-1.200 mV", annotation_position="top right",
+                      annotation_font=dict(size=9, color="#EF5350"))
+        st.plotly_chart(apply_chart(fig, 320, "PK (m)", "mV"), use_container_width=True)
 
-        # Mapa GPS corregido
-        if "Lat_corr" in df.columns and "Long_corr" in df.columns:
-            mdf = df.dropna(subset=["Lat_corr","Long_corr"])
-            if not mdf.empty:
-                divider()
-                pbi_title("Mapa GPS corregido (sobre ducto)")
-                color_col = "Estado_CP" if "Estado_CP" in mdf.columns else None
-                color_map = {
-                    "PROTEGIDO":      C_PROT,
-                    "DESPROTEGIDO":   C_SIN,
-                    "SOBREPROTEGIDO": C_SOBRE,
-                }
-                hover = {"PK_real_m": True, "Off_mV_limpio": True,
-                         "Lat_corr": False, "Long_corr": False}
-                fig = px.scatter_mapbox(
-                    mdf, lat="Lat_corr", lon="Long_corr",
-                    color=color_col,
-                    color_discrete_map=color_map if color_col else None,
-                    hover_data={k: v for k, v in hover.items() if k in mdf.columns},
-                    zoom=10, height=380, mapbox_style="open-street-map",
-                )
-                fig.update_traces(marker=dict(size=6, opacity=0.85))
-                fig.update_layout(margin=dict(t=0,b=0,l=0,r=0),
-                                   legend=dict(x=0.01,y=0.99,
-                                               bgcolor="rgba(255,255,255,0.88)",
-                                               borderwidth=1, font_size=10))
-                st.plotly_chart(fig, use_container_width=True)
-
-        with st.expander("Vista previa de datos procesados"):
-            cols = [c for c in ["PK_real_m","Lat_corr","Long_corr",
-                                 "On_mV_limpio","Off_mV_limpio",
-                                 "IR_Drop_mV_limpio","Estado_CP",
-                                 "Comentario","Anomalia"] if c in df.columns]
-            st.dataframe(df[cols].head(300), use_container_width=True, height=300)
-
-        divider()
-        pbi_title("Descargar / Subir resultados")
-        col_dl, col_sp = st.columns([1, 2])
-
-        with col_dl:
-            st.download_button(
-                "Descargar Excel procesado",
-                data=st.session_state.cips_res_bytes,
-                file_name=st.session_state.cips_res_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                use_container_width=True
-            )
-
-        with col_sp:
-            if st.session_state.cips_sp_url:
-                st.markdown(f"""
-                <div style="background:linear-gradient(135deg,#1A7A4A,#22A06B);color:white;
-                            border-radius:12px;padding:1.2rem 1.5rem;">
-                  <b>Subido a SharePoint</b><br>
-                  <a href="{st.session_state.cips_sp_url}" target="_blank"
-                     style="color:rgba(255,255,255,0.9);font-size:0.82rem;word-break:break-all;">
-                    {st.session_state.cips_sp_url}
-                  </a>
-                </div>
-                """, unsafe_allow_html=True)
-            else:
-                if st.button("Subir a SharePoint", use_container_width=True):
-                    with st.spinner("Subiendo..."):
-                        try:
-                            from mod_cips_sharepoint import subir_a_sharepoint
-                            tok = _get_sp_token()
-                            with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tf:
-                                tf.write(st.session_state.cips_res_bytes)
-                                tf_path = tf.name
-                            sub = datetime.datetime.now().strftime("%Y/%m")
-                            url = subir_a_sharepoint(tf_path, tok, subcarpeta=sub)
-                            os.unlink(tf_path)
-                            st.session_state.cips_sp_url = url
-                            st.rerun()
-                        except Exception as e:
-                            st.error(f"Error: {e}")
-
-        footer()
+    footer()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1482,13 +1329,13 @@ def fetch_sharepoint_files():
         st.sidebar.error(f"Error SharePoint: {e}")
         return [], {}
 
-
-@st.cache_data(ttl=600, show_spinner="Sincronizando archivos CIPS desde SharePoint...")
-def fetch_cips_sharepoint_files():
+@st.cache_data(ttl=600, show_spinner="Cargando resultados CIPS desde SharePoint...")
+def fetch_cips_results():
+    """Lee los Excel procesados (CIPS_*.xlsx) desde la librería Resultados_CIPS en SharePoint."""
     if "sharepoint" not in st.secrets:
         return []
     cfg = st.secrets["sharepoint"]
-    cips_folder = cfg.get("cips_folder_path", "")
+    cips_folder = cfg.get("cips_results_folder_path", "Resultados_CIPS")
     if not cips_folder:
         return []
     client_id     = cfg.get("client_id")
@@ -1543,6 +1390,18 @@ def fetch_cips_sharepoint_files():
     except Exception as e:
         st.sidebar.warning(f"SharePoint CIPS: {e}")
         return []
+
+
+def _sp_token():
+    cfg = st.secrets.get("sharepoint", {})
+    app_obj = msal.ConfidentialClientApplication(
+        cfg["client_id"],
+        authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
+        client_credential=cfg["client_secret"],
+    )
+    return app_obj.acquire_token_for_client(
+        scopes=["https://graph.microsoft.com/.default"]
+    ).get("access_token")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1637,62 +1496,46 @@ def sidebar():
             return modo, inspecciones, None, None, None, []
 
         else:  # CIPS
-            try:
-                df_lineas   = cargar_infra()
-                st.markdown("**Cliente**")
-                cliente = st.selectbox("Cliente", ["TGI","OCENSA"],
-                                       label_visibility="collapsed", key="cips_cliente")
-                if cliente == "OCENSA":
-                    df_c  = df_lineas[df_lineas["DISTRITO"] == "OCENSA"]
-                    dist  = "OCENSA"
-                    st.markdown("**Tramo**")
-                    linea = st.selectbox("Tramo", df_c["TRAMO"].tolist(),
-                                         label_visibility="collapsed", key="cips_tramo_oc")
-                else:
-                    df_c   = df_lineas[df_lineas["DISTRITO"] != "OCENSA"]
-                    dists  = sorted(df_c["DISTRITO"].unique())
-                    st.markdown("**Distrito**")
-                    dist  = st.selectbox("Distrito", dists,
-                                         label_visibility="collapsed", key="cips_dist")
-                    lineas = df_c[df_c["DISTRITO"] == dist]["TRAMO"].tolist()
-                    st.markdown("**Línea**")
-                    linea = st.selectbox("Línea", lineas,
-                                         label_visibility="collapsed", key="cips_linea")
-            except Exception:
-                st.warning("No se encontró el archivo de infraestructura.")
-                cliente, dist, linea = "TGI", "—", "—"
-
             st.markdown('<hr style="border-color:#E2E8F0;margin:0.8rem 0;">', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:0.8rem;font-weight:600;color:#475569;margin:0.5rem 0;">CARGAR INSPECCIONES CIPS</p>',
+                        unsafe_allow_html=True)
+            uploaded_cips = st.file_uploader("Excel CIPS procesado", type=["xlsx"],
+                                              accept_multiple_files=True,
+                                              label_visibility="collapsed",
+                                              key="cips_uploader")
 
-            # ── Sincronización automática desde SharePoint ────────────────────
-            sp_cips_files = fetch_cips_sharepoint_files()
-            if sp_cips_files:
-                st.markdown(
-                    f'<p style="font-size:0.78rem;color:#1B5E20;font-weight:600;">'
-                    f'SharePoint: {len(sp_cips_files)} archivo(s) sincronizado(s)</p>',
-                    unsafe_allow_html=True
-                )
-                for f in sp_cips_files:
-                    st.markdown(
-                        f'<div style="background:#F0FFF4;border:1px solid #C6F6D5;border-radius:6px;'
-                        f'padding:0.4rem 0.7rem;margin:3px 0;font-size:0.78rem;color:#22543D;">'
-                        f'{f.name}</div>',
-                        unsafe_allow_html=True
-                    )
-                if st.button("Refrescar archivos", use_container_width=True, key="cips_refresh"):
-                    fetch_cips_sharepoint_files.clear()
-                    st.rerun()
-            else:
-                has_config = bool(st.secrets.get("sharepoint", {}).get("cips_folder_path", ""))
-                if has_config:
-                    st.caption("Sin archivos en la carpeta CIPS de SharePoint")
-                    if st.button("Refrescar", use_container_width=True, key="cips_refresh"):
-                        fetch_cips_sharepoint_files.clear()
-                        st.rerun()
-                else:
-                    st.caption("Configura `cips_folder_path` en secrets.toml para sincronizar automáticamente.")
+            sp_cips = fetch_cips_results()
+            all_cips_files = (uploaded_cips or []) + [f for f in sp_cips
+                             if f.name not in {g.name for g in (uploaded_cips or [])}]
 
-            return modo, None, cliente, dist, linea, sp_cips_files
+            cips_inspecciones = []
+            vistos = set()
+            for f in all_cips_files:
+                if f.name in vistos: continue
+                vistos.add(f.name)
+                try:
+                    cips_inspecciones.append(load_cips_processed(f))
+                except Exception as e:
+                    st.error(f"{f.name[:22]}: {e}")
+
+            if cips_inspecciones:
+                st.markdown('<hr style="border-color:#E0E0E0;margin:0.6rem 0;">', unsafe_allow_html=True)
+                for d in cips_inspecciones:
+                    st.markdown(f"""
+                    <div style="background:white;border:1px solid #E2E8F0;border-radius:6px;
+                                padding:0.6rem 0.8rem;margin:4px 0;border-left:4px solid #6A1B9A;
+                                box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+                      <div style="font-size:0.85rem;font-weight:600;color:#0F172A;">
+                        CIPS <span style="font-weight:400;color:#64748B;font-size:0.8rem;">— {d['fecha']}</span>
+                      </div>
+                      <div style="font-size:0.75rem;color:#64748B;margin-top:3px;">
+                        {d['tramo']} • {len(d['df'])} pts
+                      </div>
+                    </div>""", unsafe_allow_html=True)
+            if st.button("Refrescar SP", use_container_width=True, key="cips_refresh"):
+                fetch_cips_results.clear(); st.rerun()
+
+            return modo, None, None, None, None, cips_inspecciones
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1758,8 +1601,28 @@ def main():
             render_dcvg(sel_dcvg)
 
     else:  # CIPS
-        _, _, cliente, distrito, linea, sp_files = result
-        render_cips(distrito, linea, cliente, sp_files=sp_files)
+        cips_list = result[5]
+        if not cips_list:
+            st.markdown("""
+            <div style="margin-top:4rem;text-align:center;padding:4rem;background:white;
+                        border-radius:16px;border:1px dashed #CBD5E1;animation:fadeUp 0.5s ease-out forwards;">
+              <h2 style="color:#0F172A;margin-bottom:0.8rem;font-weight:700;">Dashboard CIPS</h2>
+              <p style="color:#64748B;font-size:1.1rem;line-height:1.6;max-width:520px;margin:0 auto;">
+                Sube los archivos <b>.xlsx</b> procesados desde la app de procesamiento CIPS.<br>
+                La app mostrará el historial de inspecciones con el tablero estilo Power BI.
+              </p>
+            </div>""", unsafe_allow_html=True)
+            return
+
+        sel = cips_list[0]
+        if len(cips_list) > 1:
+            opts = {f"{d['tramo']} — {d['fecha']}": d for d in cips_list}
+            with st.sidebar:
+                st.markdown('<hr style="border-color:#E0E0E0;margin:0.6rem 0;">', unsafe_allow_html=True)
+                st.markdown('<p style="font-size:0.72rem;color:#888;margin-bottom:0.2rem;">SELECCIONAR CIPS</p>',
+                            unsafe_allow_html=True)
+                sel = opts[st.selectbox("CIPS", list(opts.keys()), label_visibility="collapsed")]
+        render_cips_dashboard(sel)
 
 
 if __name__ == "__main__":
