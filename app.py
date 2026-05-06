@@ -1215,13 +1215,15 @@ def render_cips_dashboard(d):
             c = CIPS_COLORS.get(str(val), "")
             return f"color: {c}; font-weight:600;" if c else ""
 
-        if "Estado_CP" in df.columns:
-            styled = df[show].reset_index(drop=True).style.applymap(
-                color_estado, subset=["Estado_CP"])
+        tbl = df[show].reset_index(drop=True)
+        try:
+            if "Estado_CP" in tbl.columns:
+                styled = tbl.style.map(color_estado, subset=["Estado_CP"])
+            else:
+                styled = tbl.style
             st.dataframe(styled, use_container_width=True, height=400, hide_index=True)
-        else:
-            st.dataframe(df[show].reset_index(drop=True),
-                         use_container_width=True, height=400, hide_index=True)
+        except Exception:
+            st.dataframe(tbl, use_container_width=True, height=400, hide_index=True)
 
     # ── Mapa ───────────────────────────────────────────────────────────────────
     with col_map:
