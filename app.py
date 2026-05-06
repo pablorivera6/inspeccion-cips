@@ -591,6 +591,100 @@ def apply_chart(fig, h=280, xl="Abscisa (m)", yl="", title=""):
                       opacity=0.95)
     return fig
 
+def _render_pdf(pdf_url, filename="reporte.pdf"):
+    """Descarga el PDF y lo muestra embebido usando PDF.js para máxima compatibilidad."""
+    try:
+        with st.spinner("Cargando reporte..."):
+            resp = requests.get(pdf_url, timeout=25)
+        if not resp.ok:
+            st.link_button("Abrir reporte", pdf_url, use_container_width=True)
+            return
+        b64 = base64.b64encode(resp.content).decode()
+        col_dl, _ = st.columns([1, 4])
+        with col_dl:
+            st.download_button("Descargar reporte", data=resp.content,
+                               file_name=filename, mime="application/pdf",
+                               use_container_width=True)
+        components.html(f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <style>
+            body {{ margin:0; background:#f0f2f6; }}
+            #pdf-container {{
+              width:100%; height:860px; border-radius:10px; overflow:hidden;
+              box-shadow:0 2px 12px rgba(0,0,0,0.1);
+            }}
+            canvas {{ display:block; margin:0 auto; }}
+            #controls {{
+              background:white; padding:8px 16px; display:flex;
+              align-items:center; gap:12px; font-family:Inter,sans-serif;
+              font-size:13px; border-bottom:1px solid #e2e8f0;
+            }}
+            button {{
+              background:#D50032; color:white; border:none; border-radius:6px;
+              padding:4px 12px; cursor:pointer; font-size:13px;
+            }}
+            button:hover {{ background:#a00025; }}
+            #page-info {{ color:#475569; }}
+          </style>
+        </head>
+        <body>
+          <div id="pdf-container">
+            <div id="controls">
+              <button onclick="prevPage()">&#8592;</button>
+              <span id="page-info">Cargando...</span>
+              <button onclick="nextPage()">&#8594;</button>
+            </div>
+            <canvas id="pdf-canvas" style="max-width:100%;background:white;"></canvas>
+          </div>
+          <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+          <script>
+            pdfjsLib.GlobalWorkerOptions.workerSrc =
+              'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+            var pdfDoc = null, pageNum = 1;
+            var b64 = "{b64}";
+            var bin = atob(b64);
+            var arr = new Uint8Array(bin.length);
+            for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
+
+            pdfjsLib.getDocument({{data: arr}}).promise.then(function(doc) {{
+              pdfDoc = doc;
+              renderPage(pageNum);
+            }});
+
+            function renderPage(n) {{
+              pdfDoc.getPage(n).then(function(page) {{
+                var canvas = document.getElementById('pdf-canvas');
+                var ctx = canvas.getContext('2d');
+                var vp = page.getViewport({{scale: 1.5}});
+                canvas.height = vp.height;
+                canvas.width  = vp.width;
+                page.render({{canvasContext:ctx, viewport:vp}});
+                document.getElementById('page-info').textContent =
+                  'Página ' + n + ' de ' + pdfDoc.numPages;
+              }});
+            }}
+
+            function prevPage() {{
+              if(pageNum <= 1) return;
+              pageNum--;
+              renderPage(pageNum);
+            }}
+            function nextPage() {{
+              if(pageNum >= pdfDoc.numPages) return;
+              pageNum++;
+              renderPage(pageNum);
+            }}
+          </script>
+        </body>
+        </html>
+        """, height=900)
+    except Exception:
+        st.link_button("Abrir reporte", pdf_url, use_container_width=True)
+
+
 def pbi_title(text):
     st.markdown(f'<p class="pbi-title">{text}</p>', unsafe_allow_html=True)
 
@@ -831,26 +925,7 @@ def render_pap(d):
     if d.get("pdf_url"):
         divider()
         pbi_title("Reporte de inspección")
-        try:
-            with st.spinner("Cargando reporte..."):
-                resp = requests.get(d["pdf_url"], timeout=20)
-            if resp.ok:
-                b64 = base64.b64encode(resp.content).decode()
-                col_dl, _ = st.columns([1, 3])
-                with col_dl:
-                    st.download_button("Descargar reporte", data=resp.content,
-                                       file_name="Reporte_PAP.pdf", mime="application/pdf",
-                                       use_container_width=True)
-                components.html(
-                    f'<iframe src="data:application/pdf;base64,{b64}" '
-                    f'width="100%" height="860" style="border:none;border-radius:10px;'
-                    f'box-shadow:0 2px 12px rgba(0,0,0,0.08);"></iframe>',
-                    height=880,
-                )
-            else:
-                st.link_button("Abrir reporte (SharePoint)", d["pdf_url"], use_container_width=True)
-        except Exception:
-            st.link_button("Abrir reporte (SharePoint)", d["pdf_url"], use_container_width=True)
+        _render_pdf(d["pdf_url"], "Reporte_PAP.pdf")
 
     footer()
 
@@ -974,26 +1049,7 @@ def render_dcvg(d):
     if d.get("pdf_url"):
         divider()
         pbi_title("Reporte de inspección")
-        try:
-            with st.spinner("Cargando reporte..."):
-                resp = requests.get(d["pdf_url"], timeout=20)
-            if resp.ok:
-                b64 = base64.b64encode(resp.content).decode()
-                col_dl, _ = st.columns([1, 3])
-                with col_dl:
-                    st.download_button("Descargar reporte", data=resp.content,
-                                       file_name="Reporte_DCVG.pdf", mime="application/pdf",
-                                       use_container_width=True)
-                components.html(
-                    f'<iframe src="data:application/pdf;base64,{b64}" '
-                    f'width="100%" height="860" style="border:none;border-radius:10px;'
-                    f'box-shadow:0 2px 12px rgba(0,0,0,0.08);"></iframe>',
-                    height=880,
-                )
-            else:
-                st.link_button("Abrir reporte (SharePoint)", d["pdf_url"], use_container_width=True)
-        except Exception:
-            st.link_button("Abrir reporte (SharePoint)", d["pdf_url"], use_container_width=True)
+        _render_pdf(d["pdf_url"], "Reporte_DCVG.pdf")
 
     footer()
 
