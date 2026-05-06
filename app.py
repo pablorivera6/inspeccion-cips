@@ -440,46 +440,62 @@ CIPS_COLORS = {
 
 def _parse_cips_hoja_sampled(file, max_pts: int = 5000):
     """
-    Parser de hoja CIPS con memoria constante O(max_pts).
-    Usa openpyxl read_only para iterar sin cargar todo en RAM.
-    Submuestrea dinámicamente durante la iteración.
+    Parser de hoja CIPS. Usa calamine (Rust, 10-20× más rápido que openpyxl)
+    con fallback a openpyxl read_only si calamine no está disponible.
     """
-    getattr(file, "seek", lambda x: None)(0)
-    wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
-    ws = wb["CIPS"]
+    _seek = getattr(file, "seek", lambda x: None)
 
-    header    = None
-    buf       = []        # filas muestreadas
-    step      = 1         # 1 de cada 'step' filas se guarda
-    data_idx  = 0
+    # ── Detectar fila de cabecera (scan rápido, 15 filas) ────────────────────
+    _seek(0)
+    try:
+        df_scan = pd.read_excel(file, sheet_name="CIPS", header=None,
+                                nrows=15, engine="calamine")
+        engine = "calamine"
+    except Exception:
+        _seek(0)
+        df_scan = pd.read_excel(file, sheet_name="CIPS", header=None, nrows=15)
+        engine = "openpyxl"
 
-    for row in ws.iter_rows(values_only=True):
-        vals = list(row)
-        if header is None:
-            if "KILÓMETRO" in vals:
-                header = vals
-        else:
-            if data_idx % step == 0:
-                buf.append(vals)
-                # Ajustar step dinámicamente para no superar 2×max_pts en mem
-                if len(buf) >= max_pts * 2:
-                    step *= 2
-                    buf = buf[::2]
-            data_idx += 1
+    header_row = 0
+    for idx, row in df_scan.iterrows():
+        if "KILÓMETRO" in row.values:
+            header_row = idx
+            break
 
-    wb.close()
-    gc.collect()
+    # ── Leer con calamine (rápido) o fallback ────────────────────────────────
+    _seek(0)
+    if engine == "calamine":
+        df = pd.read_excel(file, sheet_name="CIPS", header=header_row,
+                           engine="calamine")
+    else:
+        # Openpyxl en modo read_only + iteración con submuestra dinámica
+        _seek(0)
+        wb  = openpyxl.load_workbook(file, read_only=True, data_only=True)
+        ws  = wb["CIPS"]
+        hdr = None; buf = []; step = 1; didx = 0
+        for row in ws.iter_rows(values_only=True):
+            vals = list(row)
+            if hdr is None:
+                if "KILÓMETRO" in vals: hdr = vals
+            else:
+                if didx % step == 0:
+                    buf.append(vals)
+                    if len(buf) >= max_pts * 2:
+                        step *= 2; buf = buf[::2]
+                didx += 1
+        wb.close(); gc.collect()
+        if not hdr:
+            raise ValueError("No se encontró cabecera KILÓMETRO")
+        if len(buf) > max_pts:
+            buf = buf[::len(buf)//max_pts]
+        df = pd.DataFrame(buf, columns=hdr)
+        del buf; gc.collect()
+        return df
 
-    if not header:
-        raise ValueError("No se encontró cabecera KILÓMETRO")
-
-    # Submuestra final exacta
-    if len(buf) > max_pts:
-        s = len(buf) // max_pts
-        buf = buf[::s]
-
-    df = pd.DataFrame(buf, columns=header)
-    del buf
+    # ── Submuestra el DataFrame (calamine ya lo tiene en RAM, es pequeño) ────
+    if len(df) > max_pts:
+        step = len(df) // max_pts
+        df = df.iloc[::step].reset_index(drop=True)
     gc.collect()
     return df
 
