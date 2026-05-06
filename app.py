@@ -828,32 +828,29 @@ def render_pap(d):
     st.dataframe(t, use_container_width=True, height=280, hide_index=True)
 
     # ── Reporte PDF ────────────────────────────────────────────────────────────
-    divider()
-    pbi_title("Reporte de inspección (PDF)")
-    col_pdf_up, col_pdf_sp = st.columns([1, 1])
-
-    with col_pdf_up:
-        pdf_file = st.file_uploader("Sube el PDF del reporte", type=["pdf"],
-                                     key=f"pdf_up_{d.get('filename','')}", label_visibility="collapsed")
-
-    with col_pdf_sp:
-        if d.get("pdf_url"):
-            st.link_button("Abrir reporte desde SharePoint", d["pdf_url"],
-                           use_container_width=True)
-
-    if pdf_file:
-        pdf_bytes = pdf_file.read()
-        st.download_button("Descargar reporte", data=pdf_bytes,
-                           file_name=pdf_file.name, mime="application/pdf",
-                           use_container_width=True)
-        b64 = base64.b64encode(pdf_bytes).decode()
-        components.html(
-            f'<iframe src="data:application/pdf;base64,{b64}" '
-            f'width="100%" height="820" style="border:none;border-radius:10px;"></iframe>',
-            height=840,
-        )
-    elif not d.get("pdf_url"):
-        st.caption("Sube el PDF del reporte aquí, o asegúrate de que esté en la carpeta de SharePoint con el ID de la inspección en el nombre del archivo.")
+    if d.get("pdf_url"):
+        divider()
+        pbi_title("Reporte de inspección")
+        try:
+            with st.spinner("Cargando reporte..."):
+                resp = requests.get(d["pdf_url"], timeout=20)
+            if resp.ok:
+                b64 = base64.b64encode(resp.content).decode()
+                col_dl, _ = st.columns([1, 3])
+                with col_dl:
+                    st.download_button("Descargar reporte", data=resp.content,
+                                       file_name="Reporte_PAP.pdf", mime="application/pdf",
+                                       use_container_width=True)
+                components.html(
+                    f'<iframe src="data:application/pdf;base64,{b64}" '
+                    f'width="100%" height="860" style="border:none;border-radius:10px;'
+                    f'box-shadow:0 2px 12px rgba(0,0,0,0.08);"></iframe>',
+                    height=880,
+                )
+            else:
+                st.link_button("Abrir reporte (SharePoint)", d["pdf_url"], use_container_width=True)
+        except Exception:
+            st.link_button("Abrir reporte (SharePoint)", d["pdf_url"], use_container_width=True)
 
     footer()
 
@@ -974,32 +971,29 @@ def render_dcvg(d):
     st.dataframe(df[show].reset_index(drop=True), use_container_width=True, height=300, hide_index=True)
 
     # ── Reporte PDF ────────────────────────────────────────────────────────────
-    divider()
-    pbi_title("Reporte de inspección (PDF)")
-    col_pdf_up, col_pdf_sp = st.columns([1, 1])
-
-    with col_pdf_up:
-        pdf_file = st.file_uploader("Sube el PDF del reporte", type=["pdf"],
-                                     key=f"pdf_dcvg_{d.get('filename','')}", label_visibility="collapsed")
-
-    with col_pdf_sp:
-        if d.get("pdf_url"):
-            st.link_button("Abrir reporte desde SharePoint", d["pdf_url"],
-                           use_container_width=True)
-
-    if pdf_file:
-        pdf_bytes = pdf_file.read()
-        st.download_button("Descargar reporte", data=pdf_bytes,
-                           file_name=pdf_file.name, mime="application/pdf",
-                           use_container_width=True)
-        b64 = base64.b64encode(pdf_bytes).decode()
-        components.html(
-            f'<iframe src="data:application/pdf;base64,{b64}" '
-            f'width="100%" height="820" style="border:none;border-radius:10px;"></iframe>',
-            height=840,
-        )
-    elif not d.get("pdf_url"):
-        st.caption("Sube el PDF del reporte aquí, o asegúrate de que esté en la carpeta de SharePoint.")
+    if d.get("pdf_url"):
+        divider()
+        pbi_title("Reporte de inspección")
+        try:
+            with st.spinner("Cargando reporte..."):
+                resp = requests.get(d["pdf_url"], timeout=20)
+            if resp.ok:
+                b64 = base64.b64encode(resp.content).decode()
+                col_dl, _ = st.columns([1, 3])
+                with col_dl:
+                    st.download_button("Descargar reporte", data=resp.content,
+                                       file_name="Reporte_DCVG.pdf", mime="application/pdf",
+                                       use_container_width=True)
+                components.html(
+                    f'<iframe src="data:application/pdf;base64,{b64}" '
+                    f'width="100%" height="860" style="border:none;border-radius:10px;'
+                    f'box-shadow:0 2px 12px rgba(0,0,0,0.08);"></iframe>',
+                    height=880,
+                )
+            else:
+                st.link_button("Abrir reporte (SharePoint)", d["pdf_url"], use_container_width=True)
+        except Exception:
+            st.link_button("Abrir reporte (SharePoint)", d["pdf_url"], use_container_width=True)
 
     footer()
 
