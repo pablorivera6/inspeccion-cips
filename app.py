@@ -1933,10 +1933,107 @@ def sidebar():
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# Loading animation
+# ══════════════════════════════════════════════════════════════════════════════
+
+def inject_loading_animation():
+    """Reemplaza el spinner de Streamlit con el logo centrado y animado."""
+    logo_b64 = ""
+    if os.path.exists("logo-pcc-hd.png"):
+        with open("logo-pcc-hd.png", "rb") as _f:
+            logo_b64 = base64.b64encode(_f.read()).decode()
+
+    st.markdown(f"""
+    <style>
+    @keyframes pcc-spin  {{ to {{ transform: rotate(360deg); }} }}
+    @keyframes pcc-pulse {{ 0%,100% {{ transform:scale(1);   opacity:1;   }}
+                            50%      {{ transform:scale(1.07);opacity:0.88;}} }}
+    @keyframes pcc-fade  {{ from {{ opacity:0; }} to {{ opacity:1; }} }}
+
+    /* Ocultar spinner nativo de Streamlit */
+    [data-testid="stSpinnerContainer"],
+    [data-testid="stSpinner"] {{ visibility: hidden !important; }}
+
+    /* Overlay de carga */
+    #pcc-loader {{
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(255,255,255,0.97);
+        backdrop-filter: blur(6px);
+        z-index: 99999;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        animation: pcc-fade 0.2s ease;
+    }}
+    #pcc-loader-ring {{
+        position: absolute;
+        width: 144px;
+        height: 144px;
+        border-radius: 50%;
+        border: 3px solid #F1F5F9;
+        border-top-color: #D50032;
+        animation: pcc-spin 0.9s linear infinite;
+    }}
+    #pcc-loader-logo {{
+        width: 108px;
+        height: 108px;
+        object-fit: contain;
+        animation: pcc-pulse 1.6s ease-in-out infinite;
+    }}
+    #pcc-loader-text {{
+        margin-top: 1.8rem;
+        color: #94A3B8;
+        font-size: 0.82rem;
+        font-family: sans-serif;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+    }}
+    </style>
+
+    <div id="pcc-loader">
+        <div style="position:relative;width:144px;height:144px;
+                    display:flex;align-items:center;justify-content:center;">
+            <div id="pcc-loader-ring"></div>
+            <img id="pcc-loader-logo"
+                 src="data:image/png;base64,{logo_b64}"
+                 alt="PCC">
+        </div>
+        <p id="pcc-loader-text">Cargando&hellip;</p>
+    </div>
+
+    <script>
+    (function() {{
+        var overlay = document.getElementById('pcc-loader');
+        if (!overlay) return;
+
+        function check() {{
+            // Detectar spinner nativo O estado "running" de Streamlit
+            var hasSpinner = document.querySelector(
+                '[data-testid="stSpinnerContainer"], [data-testid="stSpinner"]'
+            );
+            var isRunning = document.querySelector(
+                '[data-testid="stStatusWidget"] svg, .stStatusRunning'
+            );
+            overlay.style.display = (hasSpinner || isRunning) ? 'flex' : 'none';
+        }}
+
+        // Observar cambios en el DOM para detectar aparición/desaparición del spinner
+        new MutationObserver(check).observe(document.body, {{
+            childList: true, subtree: true, attributes: true
+        }});
+    }})();
+    </script>
+    """, unsafe_allow_html=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # Main
 # ══════════════════════════════════════════════════════════════════════════════
 
 def main():
+    inject_loading_animation()
     result = sidebar()
     modo   = result[0]
 
