@@ -1622,30 +1622,40 @@ def fetch_sharepoint_files():
         return [], {}
 
 def _fetch_cips_folder(cfg, folder, categoria):
-    """Descarga xlsx con Survey Data de una carpeta SharePoint y los etiqueta."""
+    """Descarga xlsx de una carpeta SharePoint, parsea y retorna lista de dicts cargados."""
+    out = []
+    errors = []
     try:
         app_obj = msal.ConfidentialClientApplication(
             cfg["client_id"],
             authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
             client_credential=cfg["client_secret"],
         )
-        token = app_obj.acquire_token_for_client(
+        token_resp = app_obj.acquire_token_for_client(
             scopes=["https://graph.microsoft.com/.default"]
-        ).get("access_token")
+        )
+        token = token_resp.get("access_token")
         if not token:
-            return []
+            errors.append(f"No token: {token_resp.get('error_description','')}")
+            return out, errors
         headers  = {"Authorization": f"Bearer {token}"}
         hostname = f"{cfg['tenant_name']}.sharepoint.com"
         site_path = cfg["site_url"].replace(f"https://{hostname}", "")
-        site_id   = requests.get(
+        site_resp = requests.get(
             f"https://graph.microsoft.com/v1.0/sites/{hostname}:{site_path}",
             headers=headers
-        ).json().get("id")
-        items = requests.get(
+        ).json()
+        site_id = site_resp.get("id")
+        if not site_id:
+            errors.append(f"Site no encontrado: {site_resp.get('error',{}).get('message','')}")
+            return out, errors
+        items_resp = requests.get(
             f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{folder}:/children",
             headers=headers
-        ).json().get("value", [])
-        out = []
+        ).json()
+        items = items_resp.get("value", [])
+        if not items and "error" in items_resp:
+            errors.append(f"Carpeta '{folder}': {items_resp['error'].get('message','')}")
         for item in items:
             name  = item.get("name", "")
             d_url = item.get("@microsoft.graph.downloadUrl")
@@ -1653,32 +1663,40 @@ def _fetch_cips_folder(cfg, folder, categoria):
                 continue
             r = requests.get(d_url)
             if not r.ok:
+                errors.append(f"Descarga fallida {name}: HTTP {r.status_code}")
                 continue
             f = io.BytesIO(r.content)
             f.name = name
-            f.categoria = categoria
             try:
-                if "Survey Data" in pd.ExcelFile(f).sheet_names:
+                xl = pd.ExcelFile(f)
+                # Aceptar tanto archivos con "Survey Data" como cualquier otro xlsx
+                if "Survey Data" in xl.sheet_names:
                     f.seek(0)
-                    out.append(f)
-            except Exception:
-                pass
-        return out
-    except Exception:
-        return []
+                    d = load_cips_processed(f, categoria)
+                    out.append(d)
+                else:
+                    # Intentar con la primera hoja disponible
+                    f.seek(0)
+                    d = load_cips_processed(f, categoria)
+                    out.append(d)
+            except Exception as e:
+                errors.append(f"Error leyendo {name}: {e}")
+    except Exception as e:
+        errors.append(f"Error general: {e}")
+    return out, errors
 
 
 @st.cache_data(ttl=600, show_spinner="Sincronizando CIPS desde SharePoint...")
 def fetch_cips_results():
-    """Carga CIPS ACTUAL e HISTÓRICOS desde SharePoint."""
+    """Carga CIPS ACTUAL e HISTÓRICOS desde SharePoint. Retorna (actual_list, historico_list, errores)."""
     if "sharepoint" not in st.secrets:
-        return [], []
+        return [], [], ["No hay configuración de SharePoint"]
     cfg = st.secrets["sharepoint"]
     actual_folder     = cfg.get("cips_actual_folder",     "Inspecciones Ocensa/CIPS ACTUAL")
     historicos_folder = cfg.get("cips_historicos_folder", "Inspecciones Ocensa/CIPS HISTORICOS")
-    actual     = _fetch_cips_folder(cfg, actual_folder,     "ACTUAL")
-    historicos = _fetch_cips_folder(cfg, historicos_folder, "HISTÓRICO")
-    return actual, historicos
+    actual,    errs_a = _fetch_cips_folder(cfg, actual_folder,     "ACTUAL")
+    historicos, errs_h = _fetch_cips_folder(cfg, historicos_folder, "HISTÓRICO")
+    return actual, historicos, errs_a + errs_h
 
 
 def _sp_token():
@@ -1787,8 +1805,13 @@ def sidebar():
         else:  # CIPS
             st.markdown('<hr style="border-color:#E2E8F0;margin:0.8rem 0;">', unsafe_allow_html=True)
 
-            # SP sync automático
-            sp_actual, sp_hist = fetch_cips_results()
+            # SP sync automático — retorna datos ya cargados (no BytesIO)
+            actual_list, historico_list, sp_errors = fetch_cips_results()
+
+            # Mostrar errores de sync si existen
+            if sp_errors:
+                for err in sp_errors[:3]:
+                    st.warning(f"⚠ {err}", icon=None)
 
             # Upload manual (opcional)
             st.markdown('<p style="font-size:0.75rem;font-weight:600;color:#475569;margin:0.3rem 0 0.3rem;">SUBIR ARCHIVOS ADICIONALES</p>',
@@ -1798,27 +1821,16 @@ def sidebar():
                                               label_visibility="collapsed",
                                               key="cips_uploader")
 
-            # Construir lista combinada
-            def _cargar_lista(archivos_sp, cat, uploaded):
-                vistos = {f.name for f in uploaded or []}
-                result = []
-                for f in archivos_sp:
-                    if f.name in vistos: continue
-                    try:
-                        f.seek(0); result.append(load_cips_processed(f, cat))
-                    except Exception: pass
-                return result
-
-            actual_list    = _cargar_lista(sp_actual, "ACTUAL", uploaded_cips)
-            historico_list = _cargar_lista(sp_hist,   "HISTÓRICO", uploaded_cips)
-
-            # Archivos subidos manualmente → ACTUAL por defecto
-            vistos_sp = {f.name for f in sp_actual + sp_hist}
+            # Agregar archivos subidos manualmente → ACTUAL por defecto
+            nombres_sp = {d["tramo"] for d in actual_list + historico_list}
             for f in (uploaded_cips or []):
-                if f.name not in vistos_sp:
-                    try:
-                        f.seek(0); actual_list.append(load_cips_processed(f, "ACTUAL"))
-                    except Exception: pass
+                try:
+                    f.seek(0)
+                    d = load_cips_processed(f, "ACTUAL")
+                    if d["tramo"] not in nombres_sp:
+                        actual_list.append(d)
+                except Exception:
+                    pass
 
             # Mostrar en sidebar agrupado
             if actual_list or historico_list:
