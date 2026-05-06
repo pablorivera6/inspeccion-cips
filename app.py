@@ -1196,6 +1196,38 @@ def render_resumen(inspecciones):
 # CIPS — Vista comparativa Actual vs Histórico
 # ══════════════════════════════════════════════════════════════════════════════
 
+def _criticidad_stats(todos):
+    """Calcula métricas de criticidad por tramo."""
+    rows = []
+    for d in todos:
+        df2 = d["df"]
+        total = len(df2)
+        if total == 0 or "Estado_CP" not in df2.columns:
+            continue
+        n_prot  = int((df2["Estado_CP"] == "PROTEGIDO").sum())
+        n_desp  = int((df2["Estado_CP"] == "DESPROTEGIDO").sum())
+        n_sobre = int((df2["Estado_CP"] == "SOBREPROTEGIDO").sum())
+        pct_prot  = n_prot  / total * 100
+        pct_desp  = n_desp  / total * 100
+        pct_sobre = n_sobre / total * 100
+        # Score: desprotegido pesa x2 (mayor riesgo de corrosión), sobreprotegido x1
+        score = min(100, pct_desp * 2 + pct_sobre)
+        rows.append({
+            "tramo":     d["tramo"],
+            "categoria": d["categoria"],
+            "fecha":     d["fecha"],
+            "total":     total,
+            "n_prot":    n_prot,
+            "n_desp":    n_desp,
+            "n_sobre":   n_sobre,
+            "pct_prot":  round(pct_prot,  1),
+            "pct_desp":  round(pct_desp,  1),
+            "pct_sobre": round(pct_sobre, 1),
+            "score":     round(score, 1),
+        })
+    return sorted(rows, key=lambda r: r["score"], reverse=True)
+
+
 def render_cips_comparativo(actual_list, historico_list):
     todos = actual_list + historico_list
     n_act = sum(len(d["df"]) for d in actual_list)
@@ -1206,17 +1238,17 @@ def render_cips_comparativo(actual_list, historico_list):
     <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;
                 padding:1.2rem 1.8rem;margin-bottom:1rem;
                 box-shadow:0 4px 16px -4px rgba(0,0,0,0.06);
-                display:flex;align-items:center;justify-content:space-between;">
+                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.8rem;">
       <div>
         <div style="font-size:0.7rem;color:#D50032;font-weight:700;
                     text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px;">
           Inspecciones CIPS — Vista Comparativa
         </div>
         <div style="font-size:1.2rem;font-weight:800;color:#0F172A;">
-          {len(todos)} inspección{'es' if len(todos)!=1 else ''} cargada{'s' if len(todos)!=1 else ''}
+          {len(todos)} tramo{'s' if len(todos)!=1 else ''} analizados
         </div>
       </div>
-      <div style="display:flex;gap:1rem;text-align:center;">
+      <div style="display:flex;gap:1rem;text-align:center;flex-wrap:wrap;">
         <div style="background:#FFF5F6;border:1px solid #FECDD3;border-radius:10px;padding:0.6rem 1rem;">
           <div style="font-size:1.3rem;font-weight:800;color:#D50032;">{len(actual_list)}</div>
           <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
@@ -1231,34 +1263,171 @@ def render_cips_comparativo(actual_list, historico_list):
     </div>
     """, unsafe_allow_html=True)
 
-    pk_key = lambda d: next((c for c in ["PK_geom_m","PK_real_m"] if c in d["df"].columns), None)
+    # ── Análisis de criticidad ─────────────────────────────────────────────────
+    stats = _criticidad_stats(todos)
+    if stats:
+        n_total_pts = sum(r["total"] for r in stats)
+        pct_critico_global = sum(r["n_desp"] + r["n_sobre"] for r in stats) / n_total_pts * 100 if n_total_pts else 0
+        tramo_mas_critico  = stats[0]["tramo"] if stats else "—"
+        score_max          = stats[0]["score"] if stats else 0
 
-    # ── Gráfica combinada On/Off vs PK ─────────────────────────────────────────
+        # KPIs globales
+        kpi_css = ("background:white;border:1px solid #E2E8F0;border-radius:10px;"
+                   "padding:0.9rem 1.1rem;box-shadow:0 2px 8px -2px rgba(0,0,0,0.05);")
+        c1, c2, c3, c4 = st.columns(4)
+        with c1:
+            st.markdown(f'<div style="{kpi_css}">'
+                        f'<div style="font-size:0.65rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Tramos</div>'
+                        f'<div style="font-size:1.6rem;font-weight:800;color:#0F172A;">{len(stats)}</div></div>',
+                        unsafe_allow_html=True)
+        with c2:
+            st.markdown(f'<div style="{kpi_css}">'
+                        f'<div style="font-size:0.65rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Puntos totales</div>'
+                        f'<div style="font-size:1.6rem;font-weight:800;color:#0F172A;">{n_total_pts:,}</div></div>',
+                        unsafe_allow_html=True)
+        with c3:
+            color_kpi = "#D50032" if pct_critico_global > 20 else "#374151"
+            st.markdown(f'<div style="{kpi_css}">'
+                        f'<div style="font-size:0.65rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Fuera de rango global</div>'
+                        f'<div style="font-size:1.6rem;font-weight:800;color:{color_kpi};">{pct_critico_global:.1f}%</div></div>',
+                        unsafe_allow_html=True)
+        with c4:
+            st.markdown(f'<div style="{kpi_css};border-left:4px solid #D50032;">'
+                        f'<div style="font-size:0.65rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Tramo más crítico</div>'
+                        f'<div style="font-size:0.95rem;font-weight:800;color:#D50032;line-height:1.2;">'
+                        f'{tramo_mas_critico[:30]}</div>'
+                        f'<div style="font-size:0.72rem;color:#6B7280;">score {score_max:.0f}</div></div>',
+                        unsafe_allow_html=True)
+
+        st.markdown("<div style='margin:0.6rem 0;'></div>", unsafe_allow_html=True)
+
+        # Gráfica horizontal de criticidad por tramo
+        divider()
+        pbi_title("Ranking de criticidad por tramo")
+
+        bar_rows = []
+        for r in stats:
+            bar_rows.append({"Tramo": r["tramo"], "Estado": "PROTEGIDO",      "Pct": r["pct_prot"]})
+            bar_rows.append({"Tramo": r["tramo"], "Estado": "DESPROTEGIDO",   "Pct": r["pct_desp"]})
+            bar_rows.append({"Tramo": r["tramo"], "Estado": "SOBREPROTEGIDO", "Pct": r["pct_sobre"]})
+        bar_df = pd.DataFrame(bar_rows)
+        # Orden: más crítico arriba
+        order = [r["tramo"] for r in reversed(stats)]
+
+        fig_bar = px.bar(
+            bar_df, x="Pct", y="Tramo", color="Estado", orientation="h",
+            color_discrete_map={"PROTEGIDO": "#374151", "DESPROTEGIDO": "#D50032", "SOBREPROTEGIDO": "#7F1D1D"},
+            category_orders={"Tramo": order},
+            barmode="stack", height=max(260, len(stats) * 52),
+            custom_data=["Estado"],
+        )
+        fig_bar.update_traces(
+            hovertemplate="%{customdata[0]}: %{x:.1f}%<extra></extra>"
+        )
+        fig_bar.update_layout(
+            **CHART,
+            height=max(260, len(stats) * 52),
+            xaxis=dict(title="% puntos", ticksuffix="%", showgrid=True,
+                       gridcolor="#F1F5F9", range=[0, 100]),
+            yaxis=dict(title="", showgrid=False),
+            legend=dict(orientation="h", y=-0.18, font_size=11),
+            bargap=0.25,
+        )
+        # Anotación con score en cada barra
+        for r in stats:
+            fig_bar.add_annotation(
+                x=101, y=r["tramo"],
+                text=f'<b style="color:#D50032">{r["score"]:.0f}</b>',
+                showarrow=False, xanchor="left", font=dict(size=10, color="#D50032"),
+                xref="x", yref="y",
+            )
+        st.plotly_chart(fig_bar, use_container_width=True)
+
+        # Leyenda del score
+        st.markdown(
+            '<p style="font-size:0.72rem;color:#94A3B8;margin:-0.5rem 0 0.5rem;">'
+            'Score de criticidad = % desprotegido × 2 + % sobreprotegido · '
+            '<span style="color:#D50032;font-weight:600;">≥50 crítico</span> · '
+            '<span style="color:#374151;font-weight:600;">&lt;20 bajo riesgo</span></p>',
+            unsafe_allow_html=True,
+        )
+
+    # ── Mapa coloreado por Estado_CP ────────────────────────────────────────────
+    frames = []
+    for d in todos:
+        lat = "Lat_corr" if "Lat_corr" in d["df"].columns else None
+        lon = "Long_corr" if "Long_corr" in d["df"].columns else None
+        if not lat: continue
+        cols_need = [lat, lon]
+        if "Estado_CP" in d["df"].columns: cols_need.append("Estado_CP")
+        sub = d["df"].dropna(subset=[lat, lon]).copy()
+        if sub.empty: continue
+        if "Estado_CP" not in sub.columns:
+            sub["Estado_CP"] = "—"
+        sub["_tramo"]    = d["tramo"]
+        sub["_categoria"]= d["categoria"]
+        # Submuestreo para rendimiento
+        if len(sub) > 3000:
+            sub = sub.iloc[::max(1, len(sub)//3000)]
+        frames.append(sub[[lat, lon, "Estado_CP", "_tramo", "_categoria"]])
+
+    if frames:
+        divider()
+        pbi_title("Distribución geográfica — estado de protección")
+        all_pts = pd.concat(frames, ignore_index=True)
+        COLOR_MAP = {
+            "PROTEGIDO":      "#6B7280",
+            "DESPROTEGIDO":   "#D50032",
+            "SOBREPROTEGIDO": "#7F1D1D",
+            "—":              "#CBD5E1",
+        }
+        fig_map = px.scatter_mapbox(
+            all_pts, lat="Lat_corr", lon="Long_corr",
+            color="Estado_CP",
+            color_discrete_map=COLOR_MAP,
+            hover_data={"_tramo": True, "_categoria": True,
+                        "Lat_corr": False, "Long_corr": False},
+            zoom=7, height=500, mapbox_style="open-street-map",
+            category_orders={"Estado_CP": ["DESPROTEGIDO","SOBREPROTEGIDO","PROTEGIDO","—"]},
+        )
+        fig_map.update_traces(marker=dict(size=5, opacity=0.9))
+        fig_map.update_layout(
+            margin=dict(t=0, b=0, l=0, r=0),
+            legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.92)",
+                        borderwidth=1, font_size=11),
+        )
+        st.plotly_chart(fig_map, use_container_width=True)
+
+    # ── Gráfica Off mV por PK ──────────────────────────────────────────────────
+    pk_key = lambda d: next((c for c in ["PK_geom_m","PK_real_m"] if c in d["df"].columns), None)
     tiene_grafica = any(pk_key(d) and "Off_mV_limpio" in d["df"].columns for d in todos)
     if tiene_grafica:
-        pbi_title("Off mV por PK — Todas las inspecciones")
+        divider()
+        pbi_title("Perfil Off mV por PK — todos los tramos")
         fig = go.Figure()
 
-        for d in historico_list:
+        COLORES_H = ["#9CA3AF","#6B7280","#4B5563","#374151","#D1D5DB"]
+        COLORES_A = ["#D50032","#991B1B","#EF4444"]
+        for i, d in enumerate(historico_list):
             pk = pk_key(d)
             if not pk or "Off_mV_limpio" not in d["df"].columns: continue
             sub = d["df"].dropna(subset=[pk]).sort_values(pk)
-            if len(sub) > 2000: sub = sub.iloc[::max(1,len(sub)//2000)]
+            if len(sub) > 2000: sub = sub.iloc[::max(1, len(sub)//2000)]
             fig.add_trace(go.Scatter(
                 x=sub[pk], y=sub["Off_mV_limpio"],
-                mode="lines", name=f"[H] {d['tramo'][:25]}",
-                line=dict(color="#9CA3AF", width=1.2, dash="dot"),
-                opacity=0.7))
+                mode="lines", name=f"[H] {d['tramo'][:22]}",
+                line=dict(color=COLORES_H[i % len(COLORES_H)], width=1.2, dash="dot"),
+                opacity=0.75))
 
-        for d in actual_list:
+        for i, d in enumerate(actual_list):
             pk = pk_key(d)
             if not pk or "Off_mV_limpio" not in d["df"].columns: continue
             sub = d["df"].dropna(subset=[pk]).sort_values(pk)
-            if len(sub) > 2000: sub = sub.iloc[::max(1,len(sub)//2000)]
+            if len(sub) > 2000: sub = sub.iloc[::max(1, len(sub)//2000)]
             fig.add_trace(go.Scatter(
                 x=sub[pk], y=sub["Off_mV_limpio"],
-                mode="lines", name=f"[A] {d['tramo'][:25]}",
-                line=dict(color="#D50032", width=2.0)))
+                mode="lines", name=f"[A] {d['tramo'][:22]}",
+                line=dict(color=COLORES_A[i % len(COLORES_A)], width=2.0)))
 
         fig.add_hline(y=-850,  line=dict(color="#6B7280", dash="dash", width=1),
                       annotation_text="-850 mV", annotation_position="top right",
@@ -1267,84 +1436,51 @@ def render_cips_comparativo(actual_list, historico_list):
                       annotation_text="-1.200 mV", annotation_position="bottom right",
                       annotation_font=dict(size=9, color="#D50032"))
         fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(55,65,81,0.04)", line_width=0)
-
         fig.update_layout(
-            **CHART, height=340,
+            **CHART, height=360,
             xaxis_title=dict(text="PK (m)", font=dict(size=11, color="#64748B")),
             yaxis_title=dict(text="Off mV",  font=dict(size=11, color="#64748B")),
-            legend=dict(orientation="h", y=-0.25, font_size=10),
+            legend=dict(orientation="h", y=-0.28, font_size=10),
             hovermode="x unified",
         )
         fig.update_xaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
         fig.update_yaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
         st.plotly_chart(fig, use_container_width=True)
 
-    # ── Mapa combinado ──────────────────────────────────────────────────────────
-    frames = []
-    for d in historico_list:
-        lat = "Lat_corr" if "Lat_corr" in d["df"].columns else None
-        lon = "Long_corr" if "Long_corr" in d["df"].columns else None
-        if not lat: continue
-        sub = d["df"].dropna(subset=[lat, lon]).copy()
-        if sub.empty: continue
-        sub["_categoria"] = "HISTÓRICO"
-        sub["_tramo"]     = d["tramo"]
-        frames.append(sub)
-
-    for d in actual_list:
-        lat = "Lat_corr" if "Lat_corr" in d["df"].columns else None
-        lon = "Long_corr" if "Long_corr" in d["df"].columns else None
-        if not lat: continue
-        sub = d["df"].dropna(subset=[lat, lon]).copy()
-        if sub.empty: continue
-        sub["_categoria"] = "ACTUAL"
-        sub["_tramo"]     = d["tramo"]
-        frames.append(sub)
-
-    if frames:
+    # ── Tabla detallada ─────────────────────────────────────────────────────────
+    if stats:
         divider()
-        pbi_title("Mapa GPS — Actual (rojo) · Histórico (gris)")
-        all_pts = pd.concat(frames, ignore_index=True)
-        lat_c = "Lat_corr"; lon_c = "Long_corr"
-        fig = px.scatter_mapbox(
-            all_pts, lat=lat_c, lon=lon_c,
-            color="_categoria",
-            color_discrete_map={"ACTUAL": "#D50032", "HISTÓRICO": "#9CA3AF"},
-            hover_data={"_tramo": True, "_categoria": True, lat_c: False, lon_c: False},
-            zoom=7, height=420, mapbox_style="open-street-map",
-        )
-        fig.update_traces(marker=dict(size=5, opacity=0.85))
-        fig.update_layout(margin=dict(t=0,b=0,l=0,r=0),
-                          legend=dict(x=0.01,y=0.99,
-                                      bgcolor="rgba(255,255,255,0.92)",
-                                      borderwidth=1, font_size=11))
-        st.plotly_chart(fig, use_container_width=True)
-
-    # ── Tabla resumen ───────────────────────────────────────────────────────────
-    divider()
-    pbi_title("Resumen de inspecciones")
-    rows = []
-    for d in todos:
-        df2 = d["df"]
-        n_prot  = int((df2["Estado_CP"]=="PROTEGIDO").sum())      if "Estado_CP" in df2.columns else "—"
-        n_desp  = int((df2["Estado_CP"]=="DESPROTEGIDO").sum())   if "Estado_CP" in df2.columns else "—"
-        rows.append({
-            "Categoría": d["categoria"],
-            "Tramo":     d["tramo"],
-            "Fecha":     d["fecha"],
-            "Puntos":    len(df2),
-            "Protegidos": n_prot,
-            "Desprotegidos": n_desp,
-        })
-    tbl = pd.DataFrame(rows)
-    try:
-        def _color_cat(val):
-            return "color:#D50032;font-weight:700;" if val=="ACTUAL" else "color:#6B7280;font-weight:600;"
-        st.dataframe(tbl.style.map(_color_cat, subset=["Categoría"]),
-                     use_container_width=True, hide_index=True,
-                     height=min(60 + len(rows)*38, 360))
-    except Exception:
-        st.dataframe(tbl, use_container_width=True, hide_index=True)
+        pbi_title("Detalle por tramo")
+        tbl_rows = []
+        for r in stats:
+            nivel = ("🔴 CRÍTICO" if r["score"] >= 50
+                     else "🟡 MODERADO" if r["score"] >= 20
+                     else "🟢 BAJO")
+            tbl_rows.append({
+                "Tramo":         r["tramo"],
+                "Cat.":          r["categoria"],
+                "Fecha":         r["fecha"],
+                "Pts":           r["total"],
+                "% Prot.":       f"{r['pct_prot']:.1f}%",
+                "% Desprot.":    f"{r['pct_desp']:.1f}%",
+                "% Sobreprot.":  f"{r['pct_sobre']:.1f}%",
+                "Score":         r["score"],
+                "Nivel":         nivel,
+            })
+        tbl = pd.DataFrame(tbl_rows)
+        def _style_score(val):
+            if isinstance(val, float):
+                if val >= 50: return "color:#D50032;font-weight:700;"
+                if val >= 20: return "color:#B45309;font-weight:600;"
+            return "color:#374151;"
+        try:
+            st.dataframe(
+                tbl.style.map(_style_score, subset=["Score"]),
+                use_container_width=True, hide_index=True,
+                height=min(60 + len(tbl_rows)*38, 400),
+            )
+        except Exception:
+            st.dataframe(tbl, use_container_width=True, hide_index=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
