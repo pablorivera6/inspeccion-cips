@@ -436,61 +436,96 @@ CIPS_COLORS = {
 }
 
 
-def load_cips_processed(file, categoria="ACTUAL"):
-    """Carga un Excel CIPS (procesado o crudo de FastField)."""
-    df = pd.read_excel(file, sheet_name="Survey Data")
-    nombre = getattr(file, "name", str(file))
+def _estado_cp(v):
+    if pd.isna(v):   return "DESPROTEGIDO"
+    if v <= -1200:   return "SOBREPROTEGIDO"
+    if v <= -850:    return "PROTEGIDO"
+    return "DESPROTEGIDO"
 
-    # ── Normalizar columnas crudas de FastField → nombres del dashboard ───────
-    RENAME = {
+
+def _meta_from_name(nombre):
+    """Extrae tramo y fecha del nombre del archivo."""
+    base = nombre.replace(".xlsx", "")
+    parts = base.split("_")
+    if len(parts) >= 3 and parts[0].upper() == "CIPS":
+        fecha_raw = parts[-2] if len(parts) > 2 else ""
+        try:
+            fecha = datetime.datetime.strptime(fecha_raw, "%Y%m%d").strftime("%d/%m/%Y")
+            tramo = " ".join(parts[1:-2])
+            return tramo.replace("_", " "), fecha
+        except Exception:
+            pass
+    return base.replace("_", " "), "—"
+
+
+def _finalizar_df(df):
+    """Normaliza voltajes, calcula Estado_CP y limpia coordenadas."""
+    for col in ["On_mV_limpio", "Off_mV_limpio"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+            if df[col].dropna().abs().median() < 5:
+                df[col] = df[col] * 1000
+    if "Estado_CP" not in df.columns and "Off_mV_limpio" in df.columns:
+        df["Estado_CP"] = df["Off_mV_limpio"].apply(_estado_cp)
+    for c in ["Lat_corr", "Long_corr"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+    # Filtrar coordenadas fuera del rango de Colombia
+    if "Lat_corr" in df.columns:
+        df.loc[~df["Lat_corr"].between(-5, 15), "Lat_corr"] = pd.NA
+    if "Long_corr" in df.columns:
+        df.loc[~df["Long_corr"].between(-82, -65), "Long_corr"] = pd.NA
+    return df
+
+
+def load_cips_processed(file, categoria="ACTUAL"):
+    """Carga un Excel CIPS — soporta formato FastField (Survey Data) e Histórico (CIPS)."""
+    nombre = getattr(file, "name", str(file))
+    tramo, fecha = _meta_from_name(nombre)
+
+    xl = pd.ExcelFile(file)
+    getattr(file, "seek", lambda x: None)(0)
+
+    # ── Formato histórico: hoja "CIPS" con cabecera en fila 1 ────────────────
+    if "CIPS" in xl.sheet_names and "Survey Data" not in xl.sheet_names:
+        getattr(file, "seek", lambda x: None)(0)
+        df = pd.read_excel(file, sheet_name="CIPS", header=1)
+        RENAME_H = {
+            "KILÓMETRO":   "PK_geom_m",
+            "Von [V/CSE]": "On_mV_limpio",
+            "Voff [V/CSE]":"Off_mV_limpio",
+            "LATITUD":     "Lat_corr",
+            "LONGITUD":    "Long_corr",
+            "ALTITUD":     "Altitud",
+        }
+        df = df.rename(columns={k: v for k, v in RENAME_H.items() if k in df.columns})
+        # PK está en km → convertir a metros para consistencia con FastField
+        if "PK_geom_m" in df.columns:
+            df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce") * 1000
+        df = _finalizar_df(df)
+        df = df.dropna(subset=["PK_geom_m", "Off_mV_limpio"], how="all")
+        if fecha == "—":
+            fecha = "Histórico"
+        return {"df": df, "tramo": tramo, "fecha": fecha,
+                "filename": nombre, "tipo": "CIPS", "categoria": categoria}
+
+    # ── Formato FastField: hoja "Survey Data" ─────────────────────────────────
+    getattr(file, "seek", lambda x: None)(0)
+    df = pd.read_excel(file, sheet_name="Survey Data")
+    RENAME_FF = {
         "Dist From Start":          "PK_geom_m",
-        "On Voltage":               "On_mV_limpio",   # se convierte abajo
+        "On Voltage":               "On_mV_limpio",
         "Off Voltage":              "Off_mV_limpio",
         "Latitude":                 "Lat_corr",
         "Longitude":                "Long_corr",
         "Comment":                  "Comentario",
         "DCP/Feature/DCVG Anomaly": "Anomalia",
     }
-    for src, dst in RENAME.items():
+    for src, dst in RENAME_FF.items():
         if src in df.columns and dst not in df.columns:
             df = df.rename(columns={src: dst})
-
-    # Convertir voltios → milivoltios si el rango sugiere que son V
-    for col in ["On_mV_limpio", "Off_mV_limpio"]:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce")
-            if df[col].dropna().abs().median() < 5:   # valores en V, no mV
-                df[col] = df[col] * 1000
-
-    # Calcular Estado_CP si no está
-    if "Estado_CP" not in df.columns and "Off_mV_limpio" in df.columns:
-        def _estado(v):
-            if pd.isna(v):     return "DESPROTEGIDO"
-            if v <= -1200:     return "SOBREPROTEGIDO"
-            if v <= -850:      return "PROTEGIDO"
-            return "DESPROTEGIDO"
-        df["Estado_CP"] = df["Off_mV_limpio"].apply(_estado)
-
-    # Limpiar coordenadas
-    for c in ["Lat_corr", "Long_corr"]:
-        if c in df.columns:
-            df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    # Metadata desde nombre del archivo
-    parts = nombre.replace(".xlsx", "").split("_")
-    if len(parts) >= 3 and parts[0].upper() == "CIPS":
-        fecha_raw = parts[-2] if len(parts) > 2 else ""
-        try:
-            fecha = datetime.datetime.strptime(fecha_raw, "%Y%m%d").strftime("%d/%m/%Y")
-            tramo = " ".join(parts[1:-2])
-        except Exception:
-            fecha = "—"
-            tramo = " ".join(parts[1:])
-    else:
-        tramo = nombre.replace(".xlsx", "")
-        fecha = "—"
-
-    return {"df": df, "tramo": tramo.replace("_", " "), "fecha": fecha,
+    df = _finalizar_df(df)
+    return {"df": df, "tramo": tramo, "fecha": fecha,
             "filename": nombre, "tipo": "CIPS", "categoria": categoria}
 
 
@@ -1625,8 +1660,9 @@ def fetch_sharepoint_files():
 
 def _repair_xlsx(data: bytes) -> io.BytesIO:
     """
-    Parchea xlsx con XML inválido (stylesheet/sharedStrings corruptos).
-    Reemplaza el archivo problemático con una versión mínima válida.
+    Parchea xlsx con XML inválido o con valores fuera de rango en styles.xml.
+    Siempre reemplaza styles.xml con una versión mínima válida para evitar
+    errores de openpyxl como 'Max value is 14' en font.family.
     """
     _MINIMAL_STYLES = (
         b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
@@ -1642,14 +1678,15 @@ def _repair_xlsx(data: bytes) -> io.BytesIO:
             with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
                 for item in zin.infolist():
                     content = zin.read(item.filename)
-                    if item.filename in ("xl/styles.xml", "xl/sharedStrings.xml"):
+                    if item.filename == "xl/styles.xml":
+                        # Siempre reemplazar — openpyxl falla en valores semánticos
+                        # inválidos (e.g. font.family > 14) que ET.fromstring no detecta
+                        content = _MINIMAL_STYLES
+                    elif item.filename == "xl/sharedStrings.xml":
                         try:
                             _ET.fromstring(content)
                         except _ET.ParseError:
-                            if item.filename == "xl/styles.xml":
-                                content = _MINIMAL_STYLES
-                            else:
-                                content = _MINIMAL_STRINGS
+                            content = _MINIMAL_STRINGS
                     zout.writestr(item, content)
             buf.seek(0)
             return buf
