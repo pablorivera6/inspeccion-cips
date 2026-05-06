@@ -486,20 +486,27 @@ def load_cips_processed(file, categoria="ACTUAL"):
     xl = pd.ExcelFile(file)
     getattr(file, "seek", lambda x: None)(0)
 
-    # ── Formato histórico: hoja "CIPS" con cabecera en fila 1 ────────────────
+    # ── Formato histórico: hoja "CIPS" ───────────────────────────────────────
     if "CIPS" in xl.sheet_names and "Survey Data" not in xl.sheet_names:
-        getattr(file, "seek", lambda x: None)(0)
-        df = pd.read_excel(file, sheet_name="CIPS", header=1)
+        # Auto-detectar fila de cabecera: probar header=0 y 1
+        _seek = getattr(file, "seek", lambda x: None)
+        _seek(0)
+        df0 = pd.read_excel(file, sheet_name="CIPS", header=0, nrows=1)
+        _seek(0)
+        header_row = 0 if "KILÓMETRO" in df0.columns else 1
+        df = pd.read_excel(file, sheet_name="CIPS", header=header_row)
+        # Todas las variantes conocidas de nombres de columna
         RENAME_H = {
-            "KILÓMETRO":   "PK_geom_m",
-            "Von [V/CSE]": "On_mV_limpio",
-            "Voff [V/CSE]":"Off_mV_limpio",
-            "LATITUD":     "Lat_corr",
-            "LONGITUD":    "Long_corr",
-            "ALTITUD":     "Altitud",
+            "KILÓMETRO":                  "PK_geom_m",
+            "Von [V/CSE]":                "On_mV_limpio",
+            "Voff [V/CSE]":               "Off_mV_limpio",
+            "POTENCIAL ON [VCSE]":        "On_mV_limpio",
+            "POTENCIAL INSTANT OFF [VCSE]":"Off_mV_limpio",
+            "LATITUD":                    "Lat_corr",
+            "LONGITUD":                   "Long_corr",
+            "ALTITUD":                    "Altitud",
         }
         df = df.rename(columns={k: v for k, v in RENAME_H.items() if k in df.columns})
-        # PK está en km → convertir a metros para consistencia con FastField
         if "PK_geom_m" in df.columns:
             df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce") * 1000
         df = _finalizar_df(df)
@@ -1664,14 +1671,19 @@ def _repair_xlsx(data: bytes) -> io.BytesIO:
     Siempre reemplaza styles.xml con una versión mínima válida para evitar
     errores de openpyxl como 'Max value is 14' en font.family.
     """
+    import re as _re
     _MINIMAL_STYLES = (
         b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
         b'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>'
     )
-    _MINIMAL_STRINGS = (
-        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-        b'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>'
-    )
+    def _clamp_family(b: bytes) -> bytes:
+        """Clampea font family > 14 → 2; preserva todos los strings."""
+        txt = b.decode("utf-8", errors="replace")
+        return _re.sub(
+            r'family val="(\d+)"',
+            lambda m: f'family val="{min(int(m.group(1)), 14)}"',
+            txt,
+        ).encode("utf-8")
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as zin:
             buf = io.BytesIO()
@@ -1679,14 +1691,9 @@ def _repair_xlsx(data: bytes) -> io.BytesIO:
                 for item in zin.infolist():
                     content = zin.read(item.filename)
                     if item.filename == "xl/styles.xml":
-                        # Siempre reemplazar — openpyxl falla en valores semánticos
-                        # inválidos (e.g. font.family > 14) que ET.fromstring no detecta
                         content = _MINIMAL_STYLES
                     elif item.filename == "xl/sharedStrings.xml":
-                        try:
-                            _ET.fromstring(content)
-                        except _ET.ParseError:
-                            content = _MINIMAL_STRINGS
+                        content = _clamp_family(content)
                     zout.writestr(item, content)
             buf.seek(0)
             return buf
