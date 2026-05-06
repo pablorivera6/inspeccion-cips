@@ -488,27 +488,37 @@ def load_cips_processed(file, categoria="ACTUAL"):
 
     # ── Formato histórico: hoja "CIPS" ───────────────────────────────────────
     if "CIPS" in xl.sheet_names and "Survey Data" not in xl.sheet_names:
-        # Auto-detectar fila de cabecera: probar header=0 y 1
         _seek = getattr(file, "seek", lambda x: None)
+        # Escanear hasta fila 15 para encontrar la fila que contiene "KILÓMETRO"
         _seek(0)
-        df0 = pd.read_excel(file, sheet_name="CIPS", header=0, nrows=1)
+        df_scan = pd.read_excel(file, sheet_name="CIPS", header=None, nrows=15)
+        header_row = 0
+        for idx, row in df_scan.iterrows():
+            if "KILÓMETRO" in row.values:
+                header_row = idx
+                break
         _seek(0)
-        header_row = 0 if "KILÓMETRO" in df0.columns else 1
         df = pd.read_excel(file, sheet_name="CIPS", header=header_row)
         # Todas las variantes conocidas de nombres de columna
         RENAME_H = {
-            "KILÓMETRO":                  "PK_geom_m",
-            "Von [V/CSE]":                "On_mV_limpio",
-            "Voff [V/CSE]":               "Off_mV_limpio",
-            "POTENCIAL ON [VCSE]":        "On_mV_limpio",
+            "KILÓMETRO":                   "PK_geom_m",
+            "Von [V/CSE]":                 "On_mV_limpio",
+            "Voff [V/CSE]":                "Off_mV_limpio",
+            "POTENCIAL ON [VCSE]":         "On_mV_limpio",
             "POTENCIAL INSTANT OFF [VCSE]":"Off_mV_limpio",
-            "LATITUD":                    "Lat_corr",
-            "LONGITUD":                   "Long_corr",
-            "ALTITUD":                    "Altitud",
+            "LATITUD":                     "Lat_corr",
+            "LONGITUD":                    "Long_corr",
+            "ALTITUD":                     "Altitud",
+            "OBSERVACIONES":               "Comentario",
         }
         df = df.rename(columns={k: v for k, v in RENAME_H.items() if k in df.columns})
         if "PK_geom_m" in df.columns:
-            df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce") * 1000
+            df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce")
+            # Los archivos históricos guardan el PK en metros directamente;
+            # solo convertir si la mediana sugiere valores en km (< 1000)
+            median_pk = df["PK_geom_m"].dropna().median()
+            if pd.notna(median_pk) and median_pk < 1000:
+                df["PK_geom_m"] = df["PK_geom_m"] * 1000
         df = _finalizar_df(df)
         df = df.dropna(subset=["PK_geom_m", "Off_mV_limpio"], how="all")
         if fecha == "—":
