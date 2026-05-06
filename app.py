@@ -1912,12 +1912,7 @@ def _load_one_cips(meta: dict):
         del raw; gc.collect()
         f.name = name
         d = load_cips_processed(f, meta["categoria"])
-        del f
-        # Limitar a 5000 pts para reducir memoria en sesión
-        df = d["df"]
-        if len(df) > 5000:
-            d["df"] = df.iloc[::max(1, len(df)//5000)].reset_index(drop=True)
-        del df; gc.collect()
+        del f; gc.collect()
         cache[name] = d
         return d, None
     except MemoryError:
