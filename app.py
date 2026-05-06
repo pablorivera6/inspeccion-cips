@@ -325,6 +325,103 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ── Barra de progreso + animaciones JS globales ────────────────────────────────
+components.html("""
+<style>
+  /* Barra de carga superior */
+  #nprogress-bar {
+    position: fixed; top: 0; left: 0; z-index: 99999;
+    height: 3px; width: 0%;
+    background: linear-gradient(90deg, #D50032, #ff6b6b, #D50032);
+    background-size: 200% 100%;
+    animation: barLoad 1.2s ease-out forwards, gradMove 1s linear infinite;
+    border-radius: 0 3px 3px 0;
+    box-shadow: 0 0 10px rgba(213,0,50,0.6), 0 0 5px rgba(213,0,50,0.4);
+  }
+  @keyframes barLoad {
+    0%   { width: 0%; opacity: 1; }
+    70%  { width: 85%; }
+    100% { width: 100%; opacity: 0; }
+  }
+  @keyframes gradMove {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
+  }
+
+  /* Reveal on scroll */
+  .reveal {
+    opacity: 0;
+    transform: translateY(28px);
+    transition: opacity 0.6s cubic-bezier(.22,.68,0,1.2),
+                transform 0.6s cubic-bezier(.22,.68,0,1.2);
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>
+
+<div id="nprogress-bar"></div>
+
+<script>
+(function() {
+  // Barra de progreso al cargar
+  var bar = document.getElementById('nprogress-bar');
+  if (bar) {
+    setTimeout(function() { bar.style.opacity = '0'; }, 1300);
+  }
+
+  // Scroll-reveal: aplica a elementos dentro del frame principal
+  function applyReveal() {
+    try {
+      var doc = window.parent.document;
+
+      // Elementos a animar
+      var selectors = [
+        '[data-testid="stDataFrame"]',
+        '.js-plotly-plot',
+        '[data-testid="stMetric"]',
+        '[data-testid="stExpander"]',
+        '[data-testid="stVerticalBlock"] > div > div',
+      ];
+
+      selectors.forEach(function(sel) {
+        doc.querySelectorAll(sel).forEach(function(el) {
+          if (!el.classList.contains('reveal')) {
+            el.classList.add('reveal');
+          }
+        });
+      });
+
+      var observer = new IntersectionObserver(function(entries) {
+        entries.forEach(function(e) {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            observer.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.08 });
+
+      doc.querySelectorAll('.reveal').forEach(function(el) {
+        observer.observe(el);
+      });
+
+    } catch(e) {}
+  }
+
+  // Ejecutar en carga y en cada mutación del DOM
+  applyReveal();
+  setTimeout(applyReveal, 600);
+  setTimeout(applyReveal, 1500);
+
+  try {
+    var mo = new MutationObserver(function() { applyReveal(); });
+    mo.observe(window.parent.document.body, { childList: true, subtree: true });
+  } catch(e) {}
+})();
+</script>
+""", height=0)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # CIPS — Configuración y estado
@@ -730,23 +827,33 @@ def render_pap(d):
     t = df[[c for c in cols_inf if c in df.columns]].reset_index(drop=True)
     st.dataframe(t, use_container_width=True, height=280, hide_index=True)
 
-    if d.get("pdf_url"):
-        divider()
-        try:
-            with st.spinner("Cargando vista previa del reporte..."):
-                pdf_resp = requests.get(d["pdf_url"], timeout=15)
-                if pdf_resp.ok:
-                    b64_pdf = base64.b64encode(pdf_resp.content).decode("utf-8")
-                    pdf_display = f'<iframe src="data:application/pdf;base64,{b64_pdf}" width="100%" height="800px" type="application/pdf"></iframe>'
-                    with st.expander("Ver Reporte Completo (PDF)", expanded=True):
-                        st.download_button("Descargar Reporte Original", data=pdf_resp.content,
-                                           file_name="Reporte_Inspeccion.pdf", mime="application/pdf",
-                                           use_container_width=True)
-                        st.markdown(pdf_display, unsafe_allow_html=True)
-                else:
-                    st.link_button("Abrir Reporte Completo (PDF)", d["pdf_url"], use_container_width=True)
-        except Exception:
-            st.link_button("Abrir Reporte Completo (PDF)", d["pdf_url"], use_container_width=True)
+    # ── Reporte PDF ────────────────────────────────────────────────────────────
+    divider()
+    pbi_title("Reporte de inspección (PDF)")
+    col_pdf_up, col_pdf_sp = st.columns([1, 1])
+
+    with col_pdf_up:
+        pdf_file = st.file_uploader("Sube el PDF del reporte", type=["pdf"],
+                                     key=f"pdf_up_{d.get('filename','')}", label_visibility="collapsed")
+
+    with col_pdf_sp:
+        if d.get("pdf_url"):
+            st.link_button("Abrir reporte desde SharePoint", d["pdf_url"],
+                           use_container_width=True)
+
+    if pdf_file:
+        pdf_bytes = pdf_file.read()
+        st.download_button("Descargar reporte", data=pdf_bytes,
+                           file_name=pdf_file.name, mime="application/pdf",
+                           use_container_width=True)
+        b64 = base64.b64encode(pdf_bytes).decode()
+        components.html(
+            f'<iframe src="data:application/pdf;base64,{b64}" '
+            f'width="100%" height="820" style="border:none;border-radius:10px;"></iframe>',
+            height=840,
+        )
+    elif not d.get("pdf_url"):
+        st.caption("Sube el PDF del reporte aquí, o asegúrate de que esté en la carpeta de SharePoint con el ID de la inspección en el nombre del archivo.")
 
     footer()
 
@@ -866,23 +973,33 @@ def render_dcvg(d):
     show = [c for c in show if c and c in df.columns]
     st.dataframe(df[show].reset_index(drop=True), use_container_width=True, height=300, hide_index=True)
 
-    if d.get("pdf_url"):
-        divider()
-        try:
-            with st.spinner("Cargando vista previa del reporte..."):
-                pdf_resp = requests.get(d["pdf_url"], timeout=15)
-                if pdf_resp.ok:
-                    b64_pdf = base64.b64encode(pdf_resp.content).decode("utf-8")
-                    pdf_display = f'<iframe src="data:application/pdf;base64,{b64_pdf}" width="100%" height="800px" type="application/pdf"></iframe>'
-                    with st.expander("Ver Reporte Completo (PDF)", expanded=True):
-                        st.download_button("Descargar Reporte Original", data=pdf_resp.content,
-                                           file_name="Reporte_DCVG.pdf", mime="application/pdf",
-                                           use_container_width=True)
-                        st.markdown(pdf_display, unsafe_allow_html=True)
-                else:
-                    st.link_button("Abrir Reporte Completo (PDF)", d["pdf_url"], use_container_width=True)
-        except Exception:
-            st.link_button("Abrir Reporte Completo (PDF)", d["pdf_url"], use_container_width=True)
+    # ── Reporte PDF ────────────────────────────────────────────────────────────
+    divider()
+    pbi_title("Reporte de inspección (PDF)")
+    col_pdf_up, col_pdf_sp = st.columns([1, 1])
+
+    with col_pdf_up:
+        pdf_file = st.file_uploader("Sube el PDF del reporte", type=["pdf"],
+                                     key=f"pdf_dcvg_{d.get('filename','')}", label_visibility="collapsed")
+
+    with col_pdf_sp:
+        if d.get("pdf_url"):
+            st.link_button("Abrir reporte desde SharePoint", d["pdf_url"],
+                           use_container_width=True)
+
+    if pdf_file:
+        pdf_bytes = pdf_file.read()
+        st.download_button("Descargar reporte", data=pdf_bytes,
+                           file_name=pdf_file.name, mime="application/pdf",
+                           use_container_width=True)
+        b64 = base64.b64encode(pdf_bytes).decode()
+        components.html(
+            f'<iframe src="data:application/pdf;base64,{b64}" '
+            f'width="100%" height="820" style="border:none;border-radius:10px;"></iframe>',
+            height=840,
+        )
+    elif not d.get("pdf_url"):
+        st.caption("Sube el PDF del reporte aquí, o asegúrate de que esté en la carpeta de SharePoint.")
 
     footer()
 
@@ -1083,74 +1200,77 @@ def render_cips(distrito, linea, cliente, sp_files=None):
         procesar = st.button("Procesar inspección", use_container_width=True)
 
     if procesar:
-        archivos_validos = archivos  # ya filtrados arriba
+        archivos_validos = archivos
         if not archivos_validos:
-            st.error("No hay archivos válidos. Los archivos deben contener la hoja 'Survey Data'.")
-            st.stop()
-        if not shp_ok:
-            st.error("No se encontró el shapefile para el tramo seleccionado.")
-            st.stop()
+            st.error("Sube al menos un archivo Excel con hoja 'Survey Data' antes de procesar.")
+        elif not shp_ok:
+            st.error(f"No se encontró el shapefile para el tramo **{linea}**. Verifica que el tramo esté en la lista de infraestructura.")
+        else:
+            st.session_state.cips_res_df = st.session_state.cips_res_bytes = st.session_state.cips_res_name = None
+            st.session_state.cips_sp_url = None
 
-        st.session_state.cips_res_df = st.session_state.cips_res_bytes = st.session_state.cips_res_name = None
-        st.session_state.cips_sp_url = None
+            prog   = st.progress(0)
+            estado = st.empty()
 
-        prog   = st.progress(0)
-        estado = st.empty()
+            def upd(p, msg):
+                prog.progress(p, text=msg)
+                estado.caption(msg)
 
-        def upd(p, msg):
-            prog.progress(p, text=msg)
-            estado.caption(msg)
-
-        with tempfile.TemporaryDirectory() as tmp:
-            for a in archivos_validos:
-                a.seek(0)
-                with open(os.path.join(tmp, a.name), "wb") as f:
-                    f.write(a.read())
-            try:
-                upd(15, "Unificando archivos...")
-                from mod_unificar import ejecutar_unificar
-                unif = ejecutar_unificar(tmp)
-
-                upd(55, "Calculando PK geométrico (LRS)...")
-                from mod_cips_lrs import ejecutar_cips_lrs
-                salida = ejecutar_cips_lrs(tmp, unif, shp)
-
-                upd(85, "Cargando resultados...")
-                df_res = pd.read_excel(salida, sheet_name="Survey Data")
-                with open(salida, "rb") as f:
-                    xbytes = f.read()
-
-                ts     = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-                nombre = f"CIPS_{(linea or 'SIN_TRAMO').replace(' ','_')}_{ts}.xlsx"
-
-                st.session_state.cips_res_df    = df_res
-                st.session_state.cips_res_bytes = xbytes
-                st.session_state.cips_res_name  = nombre
-
-                upd(92, "Subiendo a SharePoint...")
+            _ok = False
+            with tempfile.TemporaryDirectory() as tmp:
+                for a in archivos_validos:
+                    a.seek(0)
+                    with open(os.path.join(tmp, a.name), "wb") as f:
+                        f.write(a.read())
                 try:
-                    from mod_cips_sharepoint import subir_a_sharepoint
-                    tok = _get_sp_token()
-                    if tok:
-                        tmp_sp = os.path.join(tmp, nombre)
-                        with open(tmp_sp, "wb") as f:
-                            f.write(xbytes)
-                        sub = f"ocensa/{linea.replace(' ','_')}" if cliente == "OCENSA" \
-                              else datetime.datetime.now().strftime("%Y/%m")
-                        url = subir_a_sharepoint(tmp_sp, tok, subcarpeta=sub)
-                        st.session_state.cips_sp_url = url
-                except Exception as e_sp:
-                    st.warning(f"Procesado, pero no se pudo subir a SharePoint: {e_sp}")
+                    upd(15, "Unificando archivos...")
+                    from mod_unificar import ejecutar_unificar
+                    unif = ejecutar_unificar(tmp)
 
-                upd(100, "¡Proceso completado!")
+                    upd(55, "Calculando PK geométrico (LRS)...")
+                    from mod_cips_lrs import ejecutar_cips_lrs
+                    salida = ejecutar_cips_lrs(tmp, unif, shp)
 
-            except Exception as e:
+                    upd(85, "Cargando resultados...")
+                    df_res = pd.read_excel(salida, sheet_name="Survey Data")
+                    with open(salida, "rb") as f:
+                        xbytes = f.read()
+
+                    ts     = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+                    nombre = f"CIPS_{(linea or 'SIN_TRAMO').replace(' ','_')}_{ts}.xlsx"
+
+                    st.session_state.cips_res_df    = df_res
+                    st.session_state.cips_res_bytes = xbytes
+                    st.session_state.cips_res_name  = nombre
+
+                    upd(92, "Subiendo a SharePoint...")
+                    try:
+                        from mod_cips_sharepoint import subir_a_sharepoint
+                        tok = _get_sp_token()
+                        if tok:
+                            tmp_sp = os.path.join(tmp, nombre)
+                            with open(tmp_sp, "wb") as f:
+                                f.write(xbytes)
+                            sub = f"ocensa/{linea.replace(' ','_')}" if cliente == "OCENSA" \
+                                  else datetime.datetime.now().strftime("%Y/%m")
+                            url = subir_a_sharepoint(tmp_sp, tok, subcarpeta=sub)
+                            st.session_state.cips_sp_url = url
+                    except Exception as e_sp:
+                        st.warning(f"Procesado OK, pero no se pudo subir a SharePoint: {e_sp}")
+
+                    upd(100, "¡Proceso completado!")
+                    _ok = True
+
+                except Exception as e:
+                    import traceback
+                    prog.empty(); estado.empty()
+                    st.error(f"Error en el procesamiento: {e}")
+                    with st.expander("Ver detalle del error"):
+                        st.code(traceback.format_exc())
+
+            if _ok:
                 prog.empty(); estado.empty()
-                st.error(f"Error durante el procesamiento: {e}")
-                st.stop()
-
-        prog.empty(); estado.empty()
-        st.rerun()
+                st.rerun()
 
     # ── Resultados ─────────────────────────────────────────────────────────────
     if st.session_state.cips_res_df is not None:
