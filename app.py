@@ -1162,43 +1162,108 @@ def render_cips_dashboard(d):
     if pk_col:
         df_raw[pk_col] = pd.to_numeric(df_raw[pk_col], errors="coerce")
 
-    # ── Cabecera ───────────────────────────────────────────────────────────────
     n_prot  = int((df_raw["Estado_CP"]=="PROTEGIDO").sum())      if "Estado_CP" in df_raw.columns else 0
     n_desp  = int((df_raw["Estado_CP"]=="DESPROTEGIDO").sum())   if "Estado_CP" in df_raw.columns else 0
     n_sobre = int((df_raw["Estado_CP"]=="SOBREPROTEGIDO").sum()) if "Estado_CP" in df_raw.columns else 0
+    pct_p   = f"{n_prot/total*100:.1f}%" if total else "—"
+    pct_d   = f"{n_desp/total*100:.1f}%" if total else "—"
 
+    # ── Header ─────────────────────────────────────────────────────────────────
     st.markdown(f"""
-    <div class="main-header">
-      <div class="main-header-title">
-        Dashboard CIPS <span style="color:#64748B;font-weight:400;margin-left:0.4rem;">| {tramo}</span>
+    <div style="background:linear-gradient(135deg,#0D47A1 0%,#1565C0 60%,#1976D2 100%);
+                padding:1.4rem 2rem;border-radius:14px;margin-bottom:1.2rem;
+                box-shadow:0 8px 28px -6px rgba(13,71,161,0.4);
+                display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:0.72rem;color:rgba(255,255,255,0.65);font-weight:700;
+                    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px;">
+          Inspección CIPS
+        </div>
+        <div style="font-size:1.35rem;font-weight:800;color:white;letter-spacing:-0.02em;">
+          {tramo}
+        </div>
+        <div style="font-size:0.85rem;color:rgba(255,255,255,0.75);margin-top:4px;">
+          {fecha} &nbsp;·&nbsp; {total:,} puntos medidos
+        </div>
       </div>
-      <div class="main-header-meta">
-        {fecha} • <b style="color:#0F172A;">{total:,} puntos</b>
+      <div style="display:flex;gap:1.5rem;text-align:center;">
+        <div style="background:rgba(255,255,255,0.12);border-radius:10px;padding:0.7rem 1.1rem;">
+          <div style="font-size:1.5rem;font-weight:800;color:white;">{pct_p}</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.08em;">Protegido</div>
+        </div>
+        <div style="background:rgba(213,0,50,0.25);border-radius:10px;padding:0.7rem 1.1rem;">
+          <div style="font-size:1.5rem;font-weight:800;color:#FF8A80;">{pct_d}</div>
+          <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);text-transform:uppercase;letter-spacing:0.08em;">Desprotegido</div>
+        </div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Filtros (leemos primero para aplicarlos antes de renderizar) ───────────
-    col_tbl, col_map, col_right = st.columns([0.95, 1.85, 1.0])
+    # ── KPI row ────────────────────────────────────────────────────────────────
+    animated_kpi_row([
+        ("Total puntos",     total,   "#0F172A"),
+        ("Protegidos",       n_prot,  CIPS_COLORS["PROTEGIDO"]),
+        ("Desprotegidos",    n_desp,  CIPS_COLORS["DESPROTEGIDO"]),
+        ("Sobreprotegidos",  n_sobre, CIPS_COLORS["SOBREPROTEGIDO"]),
+    ])
+
+    # ── Leer filtros ANTES de renderizar tabla y mapa ──────────────────────────
+    col_tbl, col_map, col_right = st.columns([1.0, 1.9, 0.95])
 
     with col_right:
-        pbi_title("Filtros")
+        st.markdown("""
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;
+                    padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
+          <p style="font-size:0.72rem;text-transform:uppercase;font-weight:700;
+                    color:#64748B;letter-spacing:0.08em;margin:0 0 0.8rem 0;">
+            Estado CP
+          </p>
+        """, unsafe_allow_html=True)
+
         if "Estado_CP" in df_raw.columns:
             estados_disp = sorted(df_raw["Estado_CP"].dropna().unique().tolist())
             est_sel = st.multiselect("Estado CP", estados_disp, default=estados_disp,
+                                     label_visibility="collapsed",
                                      key=f"cips_est_{d['filename']}")
         else:
             est_sel = []
 
+        st.markdown("""
+          <p style="font-size:0.72rem;text-transform:uppercase;font-weight:700;
+                    color:#64748B;letter-spacing:0.08em;margin:0.9rem 0 0.4rem 0;">
+            Rango PK (m)
+          </p>
+        """, unsafe_allow_html=True)
+
         pk_min = float(df_raw[pk_col].min()) if pk_col and df_raw[pk_col].notna().any() else 0.0
         pk_max = float(df_raw[pk_col].max()) if pk_col and df_raw[pk_col].notna().any() else 1.0
         if pk_col and pk_max > pk_min:
-            pk_sel = st.slider("PK (m)", pk_min, pk_max, (pk_min, pk_max),
-                               format="%.0f", key=f"cips_pk_{d['filename']}")
+            pk_sel = st.slider("PK", pk_min, pk_max, (pk_min, pk_max),
+                               format="%.0f", label_visibility="collapsed",
+                               key=f"cips_pk_{d['filename']}")
         else:
             pk_sel = (pk_min, pk_max)
 
-    # Aplicar filtros
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Donut
+        st.markdown("<div style='margin-top:0.8rem;'>", unsafe_allow_html=True)
+        if "Estado_CP" in df_raw.columns:
+            est_df = df_raw["Estado_CP"].value_counts().reset_index()
+            est_df.columns = ["Estado_CP","Count"]
+            fig = px.pie(est_df, values="Count", names="Estado_CP",
+                         color="Estado_CP", color_discrete_map=CIPS_COLORS, hole=0.55)
+            fig.update_layout(height=220, margin=dict(t=4,b=0,l=0,r=0),
+                               paper_bgcolor="white",
+                               showlegend=True,
+                               legend=dict(font_size=10, orientation="h",
+                                           y=-0.15, x=0.5, xanchor="center"))
+            fig.update_traces(textposition="inside", textinfo="percent",
+                               hovertemplate="%{label}<br>%{value} pts<extra></extra>")
+            st.plotly_chart(fig, use_container_width=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # ── Aplicar filtros ────────────────────────────────────────────────────────
     df = df_raw.copy()
     if est_sel and "Estado_CP" in df.columns:
         df = df[df["Estado_CP"].isin(est_sel)]
@@ -1207,90 +1272,135 @@ def render_cips_dashboard(d):
 
     # ── Tabla ──────────────────────────────────────────────────────────────────
     with col_tbl:
-        pbi_title("Datos de medición")
-        show = [c for c in [pk_col, "On_mV_limpio", "Off_mV_limpio", "Estado_CP", "IR_Drop_mV_limpio"]
+        n_fil = len(df)
+        st.markdown(f"""
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
+          <p class="pbi-title" style="margin:0;">Datos de medición</p>
+          <span style="font-size:0.75rem;color:#64748B;font-weight:600;
+                       background:#F1F5F9;padding:2px 10px;border-radius:20px;">
+            {n_fil:,} pts
+          </span>
+        </div>
+        """, unsafe_allow_html=True)
+
+        col_labels = {
+            pk_col:              "PK (m)",
+            "On_mV_limpio":      "On mV",
+            "Off_mV_limpio":     "Off mV",
+            "IR_Drop_mV_limpio": "IR Drop mV",
+            "Estado_CP":         "Estado",
+        }
+        show = [c for c in [pk_col, "On_mV_limpio", "Off_mV_limpio", "IR_Drop_mV_limpio", "Estado_CP"]
                 if c and c in df.columns]
+        tbl = df[show].rename(columns={k:v for k,v in col_labels.items() if k in show}).reset_index(drop=True)
 
         def color_estado(val):
             c = CIPS_COLORS.get(str(val), "")
-            return f"color: {c}; font-weight:600;" if c else ""
+            return f"color:{c};font-weight:700;" if c else ""
 
-        tbl = df[show].reset_index(drop=True)
         try:
-            if "Estado_CP" in tbl.columns:
-                styled = tbl.style.map(color_estado, subset=["Estado_CP"])
+            if "Estado" in tbl.columns:
+                styled = tbl.style.map(color_estado, subset=["Estado"])
             else:
                 styled = tbl.style
-            st.dataframe(styled, use_container_width=True, height=400, hide_index=True)
+            st.dataframe(styled, use_container_width=True, height=410, hide_index=True)
         except Exception:
-            st.dataframe(tbl, use_container_width=True, height=400, hide_index=True)
+            st.dataframe(tbl, use_container_width=True, height=410, hide_index=True)
 
     # ── Mapa ───────────────────────────────────────────────────────────────────
     with col_map:
-        pbi_title("Distribución geográfica")
-        lat_c = "Lat_corr" if "Lat_corr" in df.columns else "Lat"
-        lon_c = "Long_corr" if "Long_corr" in df.columns else "Long"
-        mdf   = df.dropna(subset=[lat_c, lon_c]) if lat_c in df.columns else pd.DataFrame()
+        pbi_title("Trayectoria GPS")
+        lat_c = "Lat_corr" if "Lat_corr" in df.columns else ("Latitude" if "Latitude" in df.columns else None)
+        lon_c = "Long_corr" if "Long_corr" in df.columns else ("Longitude" if "Longitude" in df.columns else None)
+        mdf   = df.dropna(subset=[lat_c, lon_c]) if lat_c and lon_c else pd.DataFrame()
+
         if not mdf.empty:
-            hover_d = {}
-            if pk_col:        hover_d[pk_col]         = True
+            hover_d = {lat_c: False, lon_c: False}
+            if pk_col and pk_col in mdf.columns:        hover_d[pk_col]         = True
             if "Off_mV_limpio" in mdf.columns: hover_d["Off_mV_limpio"] = True
-            if lat_c in mdf.columns:  hover_d[lat_c]  = False
-            if lon_c in mdf.columns:  hover_d[lon_c]  = False
+            if "Estado_CP" in mdf.columns:     hover_d["Estado_CP"]     = True
+
             fig = px.scatter_mapbox(
                 mdf, lat=lat_c, lon=lon_c,
                 color="Estado_CP" if "Estado_CP" in mdf.columns else None,
                 color_discrete_map=CIPS_COLORS,
                 hover_data=hover_d,
-                zoom=10, height=400, mapbox_style="open-street-map",
+                zoom=10, height=410, mapbox_style="open-street-map",
             )
-            fig.update_traces(marker=dict(size=5, opacity=0.9))
-            fig.update_layout(margin=dict(t=0,b=0,l=0,r=0),
-                               legend=dict(x=0.01,y=0.99,
-                                           bgcolor="rgba(255,255,255,0.9)",
-                                           borderwidth=1, font_size=10))
+            fig.update_traces(marker=dict(size=5, opacity=0.92))
+            fig.update_layout(
+                margin=dict(t=0,b=0,l=0,r=0),
+                legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.92)",
+                            borderwidth=1, font_size=10, bordercolor="#E2E8F0")
+            )
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Sin coordenadas GPS en los datos.")
+            st.markdown("""
+            <div style="height:410px;display:flex;align-items:center;justify-content:center;
+                        background:#F8FAFC;border-radius:10px;border:1px dashed #CBD5E1;">
+              <div style="text-align:center;color:#94A3B8;">
+                <div style="font-size:2rem;margin-bottom:0.5rem;">📍</div>
+                <div style="font-size:0.9rem;font-weight:500;">Sin coordenadas GPS</div>
+                <div style="font-size:0.8rem;margin-top:4px;">El archivo no tiene columnas Latitude/Longitude</div>
+              </div>
+            </div>""", unsafe_allow_html=True)
 
-    # ── Donut en col_right (continúa) ──────────────────────────────────────────
-    with col_right:
-        if "Estado_CP" in df_raw.columns:
-            est_df = df_raw["Estado_CP"].value_counts().reset_index()
-            est_df.columns = ["Estado_CP","Count"]
-            fig = px.pie(est_df, values="Count", names="Estado_CP",
-                         color="Estado_CP", color_discrete_map=CIPS_COLORS, hole=0.5)
-            fig.update_layout(height=230, margin=dict(t=8,b=0,l=0,r=0),
-                               paper_bgcolor="white",
-                               legend=dict(font_size=10, orientation="v"))
-            fig.update_traces(textposition="inside", textinfo="percent",
-                               hovertemplate="%{label}<br>%{value} pts<extra></extra>")
-            st.plotly_chart(fig, use_container_width=True)
-
-    # ── Gráfica On/Off vs PK (full width) ──────────────────────────────────────
-    divider()
-    pbi_title("On_mV_limpio y Off_mV_limpio por PK")
+    # ── Gráfica On/Off vs PK ───────────────────────────────────────────────────
     if pk_col and ("On_mV_limpio" in df.columns or "Off_mV_limpio" in df.columns):
+        divider()
         sub = df.dropna(subset=[pk_col]).sort_values(pk_col)
+        n_sub = len(sub)
+
+        # Reducir puntos para visualización si hay demasiados
+        if n_sub > 3000:
+            step = max(1, n_sub // 3000)
+            sub  = sub.iloc[::step]
+
+        pbi_title(f"On mV y Off mV por PK  ·  {n_sub:,} lecturas")
         fig = go.Figure()
+
         if "On_mV_limpio" in sub.columns:
             fig.add_trace(go.Scatter(
                 x=sub[pk_col], y=sub["On_mV_limpio"],
                 mode="lines", name="On mV",
-                line=dict(color="#64B5F6", width=1.5)))
+                line=dict(color="#90CAF9", width=1.4),
+                fill="tozeroy", fillcolor="rgba(144,202,249,0.06)"))
+
         if "Off_mV_limpio" in sub.columns:
             fig.add_trace(go.Scatter(
                 x=sub[pk_col], y=sub["Off_mV_limpio"],
                 mode="lines", name="Off mV",
-                line=dict(color="#0D47A1", width=1.8)))
-        fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(21,101,192,0.04)", line_width=0)
-        fig.add_hline(y=-850,  line=dict(color="#42A5F5", dash="dash", width=1.2),
-                      annotation_text="-850 mV", annotation_position="top right",
+                line=dict(color="#1565C0", width=2.0)))
+
+        # Zona protegida sombreada
+        fig.add_hrect(y0=-1200, y1=-850,
+                      fillcolor="rgba(21,101,192,0.06)", line_width=0,
+                      annotation_text="Zona protegida",
+                      annotation_position="top left",
+                      annotation_font=dict(size=9, color="#1565C0"))
+
+        fig.add_hline(y=-850,
+                      line=dict(color="#42A5F5", dash="dash", width=1.3),
+                      annotation_text="-850 mV",
+                      annotation_position="top right",
                       annotation_font=dict(size=9, color="#42A5F5"))
-        fig.add_hline(y=-1200, line=dict(color="#EF5350", dash="dash", width=1.2),
-                      annotation_text="-1.200 mV", annotation_position="top right",
+        fig.add_hline(y=-1200,
+                      line=dict(color="#EF5350", dash="dash", width=1.3),
+                      annotation_text="-1.200 mV",
+                      annotation_position="bottom right",
                       annotation_font=dict(size=9, color="#EF5350"))
-        st.plotly_chart(apply_chart(fig, 320, "PK (m)", "mV"), use_container_width=True)
+
+        fig.update_layout(
+            **CHART, height=340,
+            xaxis_title=dict(text="PK (m)", font=dict(size=11, color="#64748B")),
+            yaxis_title=dict(text="mV",     font=dict(size=11, color="#64748B")),
+            legend=dict(orientation="h", y=-0.2, font_size=12),
+            hoverlabel=dict(bgcolor="white", font_size=12),
+            hovermode="x unified",
+        )
+        fig.update_xaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
+        fig.update_yaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
+        st.plotly_chart(fig, use_container_width=True)
 
     footer()
 
