@@ -434,7 +434,7 @@ CIPS_COLORS = {
 }
 
 
-def load_cips_processed(file):
+def load_cips_processed(file, categoria="ACTUAL"):
     """Carga un Excel CIPS (procesado o crudo de FastField)."""
     df = pd.read_excel(file, sheet_name="Survey Data")
     nombre = getattr(file, "name", str(file))
@@ -489,7 +489,7 @@ def load_cips_processed(file):
         fecha = "—"
 
     return {"df": df, "tramo": tramo.replace("_", " "), "fecha": fecha,
-            "filename": nombre, "tipo": "CIPS"}
+            "filename": nombre, "tipo": "CIPS", "categoria": categoria}
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1149,6 +1149,161 @@ def render_resumen(inspecciones):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
+# CIPS — Vista comparativa Actual vs Histórico
+# ══════════════════════════════════════════════════════════════════════════════
+
+def render_cips_comparativo(actual_list, historico_list):
+    todos = actual_list + historico_list
+    n_act = sum(len(d["df"]) for d in actual_list)
+    n_his = sum(len(d["df"]) for d in historico_list)
+
+    # ── Header ─────────────────────────────────────────────────────────────────
+    st.markdown(f"""
+    <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;
+                padding:1.2rem 1.8rem;margin-bottom:1rem;
+                box-shadow:0 4px 16px -4px rgba(0,0,0,0.06);
+                display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div style="font-size:0.7rem;color:#D50032;font-weight:700;
+                    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px;">
+          Inspecciones CIPS — Vista Comparativa
+        </div>
+        <div style="font-size:1.2rem;font-weight:800;color:#0F172A;">
+          {len(todos)} inspección{'es' if len(todos)!=1 else ''} cargada{'s' if len(todos)!=1 else ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:1rem;text-align:center;">
+        <div style="background:#FFF5F6;border:1px solid #FECDD3;border-radius:10px;padding:0.6rem 1rem;">
+          <div style="font-size:1.3rem;font-weight:800;color:#D50032;">{len(actual_list)}</div>
+          <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
+          <div style="font-size:0.72rem;color:#D50032;font-weight:600;">{n_act:,} pts</div>
+        </div>
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:0.6rem 1rem;">
+          <div style="font-size:1.3rem;font-weight:800;color:#6B7280;">{len(historico_list)}</div>
+          <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Históricos</div>
+          <div style="font-size:0.72rem;color:#6B7280;font-weight:600;">{n_his:,} pts</div>
+        </div>
+      </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    pk_key = lambda d: next((c for c in ["PK_geom_m","PK_real_m"] if c in d["df"].columns), None)
+
+    # ── Gráfica combinada On/Off vs PK ─────────────────────────────────────────
+    tiene_grafica = any(pk_key(d) and "Off_mV_limpio" in d["df"].columns for d in todos)
+    if tiene_grafica:
+        pbi_title("Off mV por PK — Todas las inspecciones")
+        fig = go.Figure()
+
+        for d in historico_list:
+            pk = pk_key(d)
+            if not pk or "Off_mV_limpio" not in d["df"].columns: continue
+            sub = d["df"].dropna(subset=[pk]).sort_values(pk)
+            if len(sub) > 2000: sub = sub.iloc[::max(1,len(sub)//2000)]
+            fig.add_trace(go.Scatter(
+                x=sub[pk], y=sub["Off_mV_limpio"],
+                mode="lines", name=f"[H] {d['tramo'][:25]}",
+                line=dict(color="#9CA3AF", width=1.2, dash="dot"),
+                opacity=0.7))
+
+        for d in actual_list:
+            pk = pk_key(d)
+            if not pk or "Off_mV_limpio" not in d["df"].columns: continue
+            sub = d["df"].dropna(subset=[pk]).sort_values(pk)
+            if len(sub) > 2000: sub = sub.iloc[::max(1,len(sub)//2000)]
+            fig.add_trace(go.Scatter(
+                x=sub[pk], y=sub["Off_mV_limpio"],
+                mode="lines", name=f"[A] {d['tramo'][:25]}",
+                line=dict(color="#D50032", width=2.0)))
+
+        fig.add_hline(y=-850,  line=dict(color="#6B7280", dash="dash", width=1),
+                      annotation_text="-850 mV", annotation_position="top right",
+                      annotation_font=dict(size=9, color="#6B7280"))
+        fig.add_hline(y=-1200, line=dict(color="#D50032", dash="dash", width=1),
+                      annotation_text="-1.200 mV", annotation_position="bottom right",
+                      annotation_font=dict(size=9, color="#D50032"))
+        fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(55,65,81,0.04)", line_width=0)
+
+        fig.update_layout(
+            **CHART, height=340,
+            xaxis_title=dict(text="PK (m)", font=dict(size=11, color="#64748B")),
+            yaxis_title=dict(text="Off mV",  font=dict(size=11, color="#64748B")),
+            legend=dict(orientation="h", y=-0.25, font_size=10),
+            hovermode="x unified",
+        )
+        fig.update_xaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
+        fig.update_yaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ── Mapa combinado ──────────────────────────────────────────────────────────
+    frames = []
+    for d in historico_list:
+        lat = "Lat_corr" if "Lat_corr" in d["df"].columns else None
+        lon = "Long_corr" if "Long_corr" in d["df"].columns else None
+        if not lat: continue
+        sub = d["df"].dropna(subset=[lat, lon]).copy()
+        if sub.empty: continue
+        sub["_categoria"] = "HISTÓRICO"
+        sub["_tramo"]     = d["tramo"]
+        frames.append(sub)
+
+    for d in actual_list:
+        lat = "Lat_corr" if "Lat_corr" in d["df"].columns else None
+        lon = "Long_corr" if "Long_corr" in d["df"].columns else None
+        if not lat: continue
+        sub = d["df"].dropna(subset=[lat, lon]).copy()
+        if sub.empty: continue
+        sub["_categoria"] = "ACTUAL"
+        sub["_tramo"]     = d["tramo"]
+        frames.append(sub)
+
+    if frames:
+        divider()
+        pbi_title("Mapa GPS — Actual (rojo) · Histórico (gris)")
+        all_pts = pd.concat(frames, ignore_index=True)
+        lat_c = "Lat_corr"; lon_c = "Long_corr"
+        fig = px.scatter_mapbox(
+            all_pts, lat=lat_c, lon=lon_c,
+            color="_categoria",
+            color_discrete_map={"ACTUAL": "#D50032", "HISTÓRICO": "#9CA3AF"},
+            hover_data={"_tramo": True, "_categoria": True, lat_c: False, lon_c: False},
+            zoom=7, height=420, mapbox_style="open-street-map",
+        )
+        fig.update_traces(marker=dict(size=5, opacity=0.85))
+        fig.update_layout(margin=dict(t=0,b=0,l=0,r=0),
+                          legend=dict(x=0.01,y=0.99,
+                                      bgcolor="rgba(255,255,255,0.92)",
+                                      borderwidth=1, font_size=11))
+        st.plotly_chart(fig, use_container_width=True)
+
+    # ── Tabla resumen ───────────────────────────────────────────────────────────
+    divider()
+    pbi_title("Resumen de inspecciones")
+    rows = []
+    for d in todos:
+        df2 = d["df"]
+        n_prot  = int((df2["Estado_CP"]=="PROTEGIDO").sum())      if "Estado_CP" in df2.columns else "—"
+        n_desp  = int((df2["Estado_CP"]=="DESPROTEGIDO").sum())   if "Estado_CP" in df2.columns else "—"
+        rows.append({
+            "Categoría": d["categoria"],
+            "Tramo":     d["tramo"],
+            "Fecha":     d["fecha"],
+            "Puntos":    len(df2),
+            "Protegidos": n_prot,
+            "Desprotegidos": n_desp,
+        })
+    tbl = pd.DataFrame(rows)
+    try:
+        def _color_cat(val):
+            return "color:#D50032;font-weight:700;" if val=="ACTUAL" else "color:#6B7280;font-weight:600;"
+        st.dataframe(tbl.style.map(_color_cat, subset=["Categoría"]),
+                     use_container_width=True, hide_index=True,
+                     height=min(60 + len(rows)*38, 360))
+    except Exception:
+        st.dataframe(tbl, use_container_width=True, hide_index=True)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
 # CIPS — Dashboard histórico (estilo Power BI)
 # ══════════════════════════════════════════════════════════════════════════════
 
@@ -1466,67 +1621,64 @@ def fetch_sharepoint_files():
         st.sidebar.error(f"Error SharePoint: {e}")
         return [], {}
 
-@st.cache_data(ttl=600, show_spinner="Cargando resultados CIPS desde SharePoint...")
-def fetch_cips_results():
-    """Lee los Excel procesados (CIPS_*.xlsx) desde la librería Resultados_CIPS en SharePoint."""
-    if "sharepoint" not in st.secrets:
-        return []
-    cfg = st.secrets["sharepoint"]
-    cips_folder = cfg.get("cips_results_folder_path", "Resultados_CIPS")
-    if not cips_folder:
-        return []
-    client_id     = cfg.get("client_id")
-    client_secret = cfg.get("client_secret")
-    tenant_id     = cfg.get("tenant_id")
-    tenant_name   = cfg.get("tenant_name")
-    site_url      = cfg.get("site_url")
+def _fetch_cips_folder(cfg, folder, categoria):
+    """Descarga xlsx con Survey Data de una carpeta SharePoint y los etiqueta."""
     try:
-        authority = f"https://login.microsoftonline.com/{tenant_id}"
-        app_obj   = msal.ConfidentialClientApplication(
-            client_id, authority=authority, client_credential=client_secret
+        app_obj = msal.ConfidentialClientApplication(
+            cfg["client_id"],
+            authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
+            client_credential=cfg["client_secret"],
         )
-        result = app_obj.acquire_token_for_client(scopes=["https://graph.microsoft.com/.default"])
-        if "access_token" not in result:
+        token = app_obj.acquire_token_for_client(
+            scopes=["https://graph.microsoft.com/.default"]
+        ).get("access_token")
+        if not token:
             return []
-        token    = result["access_token"]
         headers  = {"Authorization": f"Bearer {token}"}
-        hostname = f"{tenant_name}.sharepoint.com"
-        site_path = site_url.replace(f"https://{hostname}", "")
-        resp = requests.get(
+        hostname = f"{cfg['tenant_name']}.sharepoint.com"
+        site_path = cfg["site_url"].replace(f"https://{hostname}", "")
+        site_id   = requests.get(
             f"https://graph.microsoft.com/v1.0/sites/{hostname}:{site_path}",
             headers=headers
-        )
-        if not resp.ok:
-            return []
-        site_id = resp.json().get("id")
-        resp = requests.get(
-            f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{cips_folder}:/children",
+        ).json().get("id")
+        items = requests.get(
+            f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{folder}:/children",
             headers=headers
-        )
-        if not resp.ok:
-            return []
-        downloaded = []
-        for item in resp.json().get("value", []):
+        ).json().get("value", [])
+        out = []
+        for item in items:
             name  = item.get("name", "")
             d_url = item.get("@microsoft.graph.downloadUrl")
             if not name.endswith(".xlsx") or name.startswith("~") or not d_url:
                 continue
-            f_resp = requests.get(d_url)
-            if not f_resp.ok:
+            r = requests.get(d_url)
+            if not r.ok:
                 continue
-            f_obj = io.BytesIO(f_resp.content)
-            f_obj.name = name
-            # Solo incluir si tiene hoja Survey Data
+            f = io.BytesIO(r.content)
+            f.name = name
+            f.categoria = categoria
             try:
-                if "Survey Data" in pd.ExcelFile(f_obj).sheet_names:
-                    f_obj.seek(0)
-                    downloaded.append(f_obj)
+                if "Survey Data" in pd.ExcelFile(f).sheet_names:
+                    f.seek(0)
+                    out.append(f)
             except Exception:
                 pass
-        return downloaded
-    except Exception as e:
-        st.sidebar.warning(f"SharePoint CIPS: {e}")
+        return out
+    except Exception:
         return []
+
+
+@st.cache_data(ttl=600, show_spinner="Sincronizando CIPS desde SharePoint...")
+def fetch_cips_results():
+    """Carga CIPS ACTUAL e HISTÓRICOS desde SharePoint."""
+    if "sharepoint" not in st.secrets:
+        return [], []
+    cfg = st.secrets["sharepoint"]
+    actual_folder     = cfg.get("cips_actual_folder",     "Inspecciones Ocensa/CIPS ACTUAL")
+    historicos_folder = cfg.get("cips_historicos_folder", "Inspecciones Ocensa/CIPS HISTORICOS")
+    actual     = _fetch_cips_folder(cfg, actual_folder,     "ACTUAL")
+    historicos = _fetch_cips_folder(cfg, historicos_folder, "HISTÓRICO")
+    return actual, historicos
 
 
 def _sp_token():
@@ -1634,45 +1786,65 @@ def sidebar():
 
         else:  # CIPS
             st.markdown('<hr style="border-color:#E2E8F0;margin:0.8rem 0;">', unsafe_allow_html=True)
-            st.markdown('<p style="font-size:0.8rem;font-weight:600;color:#475569;margin:0.5rem 0;">CARGAR INSPECCIONES CIPS</p>',
+
+            # SP sync automático
+            sp_actual, sp_hist = fetch_cips_results()
+
+            # Upload manual (opcional)
+            st.markdown('<p style="font-size:0.75rem;font-weight:600;color:#475569;margin:0.3rem 0 0.3rem;">SUBIR ARCHIVOS ADICIONALES</p>',
                         unsafe_allow_html=True)
-            uploaded_cips = st.file_uploader("Excel CIPS procesado", type=["xlsx"],
+            uploaded_cips = st.file_uploader("Excel CIPS", type=["xlsx"],
                                               accept_multiple_files=True,
                                               label_visibility="collapsed",
                                               key="cips_uploader")
 
-            sp_cips = fetch_cips_results()
-            all_cips_files = (uploaded_cips or []) + [f for f in sp_cips
-                             if f.name not in {g.name for g in (uploaded_cips or [])}]
+            # Construir lista combinada
+            def _cargar_lista(archivos_sp, cat, uploaded):
+                vistos = {f.name for f in uploaded or []}
+                result = []
+                for f in archivos_sp:
+                    if f.name in vistos: continue
+                    try:
+                        f.seek(0); result.append(load_cips_processed(f, cat))
+                    except Exception: pass
+                return result
 
-            cips_inspecciones = []
-            vistos = set()
-            for f in all_cips_files:
-                if f.name in vistos: continue
-                vistos.add(f.name)
-                try:
-                    cips_inspecciones.append(load_cips_processed(f))
-                except Exception as e:
-                    st.error(f"{f.name[:22]}: {e}")
+            actual_list    = _cargar_lista(sp_actual, "ACTUAL", uploaded_cips)
+            historico_list = _cargar_lista(sp_hist,   "HISTÓRICO", uploaded_cips)
 
-            if cips_inspecciones:
+            # Archivos subidos manualmente → ACTUAL por defecto
+            vistos_sp = {f.name for f in sp_actual + sp_hist}
+            for f in (uploaded_cips or []):
+                if f.name not in vistos_sp:
+                    try:
+                        f.seek(0); actual_list.append(load_cips_processed(f, "ACTUAL"))
+                    except Exception: pass
+
+            # Mostrar en sidebar agrupado
+            if actual_list or historico_list:
                 st.markdown('<hr style="border-color:#E0E0E0;margin:0.6rem 0;">', unsafe_allow_html=True)
-                for d in cips_inspecciones:
-                    st.markdown(f"""
-                    <div style="background:white;border:1px solid #E2E8F0;border-radius:6px;
-                                padding:0.6rem 0.8rem;margin:4px 0;border-left:4px solid #6A1B9A;
-                                box-shadow:0 1px 2px rgba(0,0,0,0.02);">
-                      <div style="font-size:0.85rem;font-weight:600;color:#0F172A;">
-                        CIPS <span style="font-weight:400;color:#64748B;font-size:0.8rem;">— {d['fecha']}</span>
-                      </div>
-                      <div style="font-size:0.75rem;color:#64748B;margin-top:3px;">
-                        {d['tramo']} • {len(d['df'])} pts
-                      </div>
-                    </div>""", unsafe_allow_html=True)
-            if st.button("Refrescar SP", use_container_width=True, key="cips_refresh"):
+                for label, lst, color in [("ACTUALES", actual_list, "#D50032"),
+                                           ("HISTÓRICOS", historico_list, "#6B7280")]:
+                    if not lst: continue
+                    st.markdown(f'<p style="font-size:0.67rem;color:{color};font-weight:700;'
+                                f'letter-spacing:0.08em;margin:0.7rem 0 0.2rem;">{label}</p>',
+                                unsafe_allow_html=True)
+                    for d in lst:
+                        st.markdown(f"""
+                        <div style="background:white;border:1px solid #E2E8F0;border-radius:6px;
+                                    padding:0.5rem 0.8rem;margin:3px 0;border-left:3px solid {color};">
+                          <div style="font-size:0.82rem;font-weight:600;color:#0F172A;">
+                            {d['tramo'][:28]}
+                          </div>
+                          <div style="font-size:0.72rem;color:#64748B;margin-top:2px;">
+                            {d['fecha']} · {len(d['df']):,} pts
+                          </div>
+                        </div>""", unsafe_allow_html=True)
+
+            if st.button("Refrescar SharePoint", use_container_width=True, key="cips_refresh"):
                 fetch_cips_results.clear(); st.rerun()
 
-            return modo, None, None, None, None, cips_inspecciones
+            return modo, None, None, None, None, (actual_list, historico_list)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1738,28 +1910,34 @@ def main():
             render_dcvg(sel_dcvg)
 
     else:  # CIPS
-        cips_list = result[5]
-        if not cips_list:
+        actual_list, historico_list = result[5]
+        todos = actual_list + historico_list
+
+        if not todos:
             st.markdown("""
             <div style="margin-top:4rem;text-align:center;padding:4rem;background:white;
                         border-radius:16px;border:1px dashed #CBD5E1;animation:fadeUp 0.5s ease-out forwards;">
               <h2 style="color:#0F172A;margin-bottom:0.8rem;font-weight:700;">Dashboard CIPS</h2>
               <p style="color:#64748B;font-size:1.1rem;line-height:1.6;max-width:520px;margin:0 auto;">
-                Sube los archivos <b>.xlsx</b> procesados desde la app de procesamiento CIPS.<br>
-                La app mostrará el historial de inspecciones con el tablero estilo Power BI.
+                Los archivos se sincronizan automáticamente desde SharePoint.<br>
+                También puedes subir archivos <b>.xlsx</b> manualmente desde el panel lateral.
               </p>
             </div>""", unsafe_allow_html=True)
             return
 
-        sel = cips_list[0]
-        if len(cips_list) > 1:
-            opts = {f"{d['tramo']} — {d['fecha']}": d for d in cips_list}
-            with st.sidebar:
-                st.markdown('<hr style="border-color:#E0E0E0;margin:0.6rem 0;">', unsafe_allow_html=True)
-                st.markdown('<p style="font-size:0.72rem;color:#888;margin-bottom:0.2rem;">SELECCIONAR CIPS</p>',
-                            unsafe_allow_html=True)
-                sel = opts[st.selectbox("CIPS", list(opts.keys()), label_visibility="collapsed")]
-        render_cips_dashboard(sel)
+        # Vista general comparativa (siempre visible si hay datos)
+        render_cips_comparativo(actual_list, historico_list)
+
+        # Detalle de inspección individual (selector)
+        if todos:
+            divider()
+            st.markdown('<p style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:0.4rem;">VER DETALLE DE INSPECCIÓN</p>',
+                        unsafe_allow_html=True)
+            opts = {f"{'🔴' if d['categoria']=='ACTUAL' else '⬜'} {d['tramo']} — {d['fecha']}": d
+                    for d in todos}
+            sel_key = st.selectbox("Inspección", list(opts.keys()),
+                                   label_visibility="collapsed", key="cips_detail_sel")
+            render_cips_dashboard(opts[sel_key])
 
 
 if __name__ == "__main__":
