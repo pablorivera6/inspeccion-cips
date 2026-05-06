@@ -49,33 +49,103 @@ st.markdown("""
   .stApp { background: #F8FAFC; }
   .block-container { padding: 2rem 2.5rem 1rem 2.5rem !important; max-width: 1400px; }
 
-  /* Sidebar */
+  /* ── Keyframes ─────────────────────────────────────────────────────────── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes slideInLeft {
+    from { opacity: 0; transform: translateX(-24px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(24px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.88); }
+    to   { opacity: 1; transform: scale(1); }
+  }
+  @keyframes pulseGlow {
+    0%, 100% { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04); }
+    50%       { box-shadow: 0 8px 30px -4px rgba(213,0,50,0.18); }
+  }
+  @keyframes gradientShift {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  @keyframes dotPulse {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50%       { transform: scale(1.35); opacity: 0.75; }
+  }
+  @keyframes shimmer {
+    0%   { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+  @keyframes borderDraw {
+    from { opacity: 0; transform: scaleX(0); transform-origin: left; }
+    to   { opacity: 1; transform: scaleX(1); }
+  }
+  @keyframes countPop {
+    0%   { transform: scale(0.6); opacity: 0; }
+    70%  { transform: scale(1.08); }
+    100% { transform: scale(1);   opacity: 1; }
+  }
+  @keyframes footerSlide {
+    from { opacity: 0; transform: translateY(30px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── Sidebar ───────────────────────────────────────────────────────────── */
   [data-testid="stSidebar"] > div:first-child {
     background: #FFFFFF;
     border-right: 1px solid #E2E8F0;
-    box-shadow: 2px 0 10px rgba(0,0,0,0.02);
+    box-shadow: 2px 0 14px rgba(0,0,0,0.04);
+    animation: slideInLeft 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
   }
   [data-testid="stSidebar"] * { color: #1E293B !important; }
   [data-testid="stSidebar"] hr { border-color: #E2E8F0; }
-
-  /* Radio navigation */
   [data-testid="stSidebar"] [data-testid="stRadio"] label {
     font-size: 0.88rem !important; font-weight: 600 !important;
+    transition: color 0.2s ease !important;
   }
 
-  /* Títulos de sección */
+  /* ── Títulos de sección ────────────────────────────────────────────────── */
   .pbi-title {
     font-size: 1rem; font-weight: 600; color: #0F172A;
     margin: 1.2rem 0 0.8rem 0; letter-spacing: -0.01em;
+    animation: fadeIn 0.5s ease-out forwards;
+    position: relative; padding-left: 10px;
+  }
+  .pbi-title::before {
+    content: '';
+    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 70%; border-radius: 4px;
+    background: linear-gradient(180deg, #D50032, #ff6b6b);
+    animation: borderDraw 0.4s ease-out 0.2s both;
   }
 
-  /* Header principal */
+  /* ── Header principal ──────────────────────────────────────────────────── */
   .main-header {
-    background: white; padding: 1.2rem 1.8rem;
-    border-radius: 12px; border: 1px solid #E2E8F0;
-    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.02);
+    background: linear-gradient(135deg, #ffffff 0%, #fafcff 100%);
+    padding: 1.2rem 1.8rem;
+    border-radius: 14px;
+    border: 1px solid #E2E8F0;
+    border-left: 4px solid #D50032;
+    box-shadow: 0 4px 16px -4px rgba(0,0,0,0.06);
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 1.5rem;
+    animation: fadeUp 0.5s cubic-bezier(.22,.68,0,1.2) forwards;
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+  }
+  .main-header:hover {
+    box-shadow: 0 8px 28px -6px rgba(213,0,50,0.12);
+    transform: translateY(-1px);
   }
   .main-header-title {
     font-size: 1.3rem; font-weight: 700; color: #8B0000;
@@ -83,41 +153,85 @@ st.markdown("""
   }
   .main-header-meta { font-size: 0.9rem; color: #64748B; font-weight: 500; }
 
-  /* Cards */
+  /* ── Cards / Stats ─────────────────────────────────────────────────────── */
   .stat-container {
-    background: white; border: 1px solid #E2E8F0; border-radius: 10px;
-    padding: 1.2rem; box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    background: white; border: 1px solid #E2E8F0; border-radius: 12px;
+    padding: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    opacity: 0;
+    animation: scaleIn 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    cursor: default;
   }
+  .stat-container:hover {
+    transform: translateY(-4px) scale(1.01);
+    box-shadow: 0 12px 32px -8px rgba(0,0,0,0.12);
+  }
+  .stat-container:nth-child(1) { animation-delay: 0.05s; }
+  .stat-container:nth-child(2) { animation-delay: 0.12s; }
+  .stat-container:nth-child(3) { animation-delay: 0.19s; }
+  .stat-container:nth-child(4) { animation-delay: 0.26s; }
+  .stat-container:nth-child(5) { animation-delay: 0.33s; }
+
   .stat-label {
     font-size: 0.75rem; text-transform: uppercase; font-weight: 600;
     color: #64748B; letter-spacing: 0.05em; margin-bottom: 6px;
   }
-  .stat-val { font-size: 1.6rem; font-weight: 700; color: #0F172A; margin-bottom: 0; }
+  .stat-val {
+    font-size: 1.6rem; font-weight: 700; color: #0F172A; margin-bottom: 0;
+    animation: countPop 0.5s cubic-bezier(.22,.68,0,1.2) 0.3s both;
+  }
 
-  /* Estado list */
+  /* ── Estado list + dots ────────────────────────────────────────────────── */
   .estado-item {
     display: flex; align-items: center; gap: 8px;
     font-size: 0.85rem; margin: 6px 0; padding: 4px 0;
+    animation: slideInLeft 0.35s ease-out forwards;
+    transition: background 0.2s ease; border-radius: 6px; padding: 4px 6px;
   }
-  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .estado-item:hover { background: #F8FAFC; }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+    animation: dotPulse 2.5s ease-in-out infinite;
+  }
 
-  /* Footer */
+  /* ── Footer ────────────────────────────────────────────────────────────── */
   .pcc-footer {
-    background: linear-gradient(135deg, #D50032 0%, #A00025 100%);
-    color: white; padding: 1.2rem 2rem; margin-top: 3rem; border-radius: 12px;
+    background: linear-gradient(135deg, #D50032 0%, #8B0000 50%, #A00025 100%);
+    background-size: 200% 200%;
+    color: white; padding: 1.4rem 2rem; margin-top: 3rem; border-radius: 14px;
     display: flex; align-items: center; gap: 1rem;
-    box-shadow: 0 10px 25px -5px rgba(213,0,50,0.3);
+    box-shadow: 0 12px 32px -6px rgba(213,0,50,0.35);
+    animation: footerSlide 0.6s cubic-bezier(.22,.68,0,1.2) 0.2s both,
+               gradientShift 6s ease infinite;
+    transition: box-shadow 0.3s ease;
   }
-  .pcc-footer-logo { font-size: 1.6rem; font-weight: 800; letter-spacing: -1px; }
+  .pcc-footer:hover {
+    box-shadow: 0 16px 40px -6px rgba(213,0,50,0.45);
+  }
+  .pcc-footer-logo {
+    font-size: 1.6rem; font-weight: 800; letter-spacing: -1px;
+    animation: slideInLeft 0.5s cubic-bezier(.22,.68,0,1.2) 0.4s both;
+  }
   .pcc-footer-text { font-size: 0.95rem; font-weight: 500; opacity: 0.9; }
 
-  /* Separadores */
-  .sec-div { border-top: 1px solid #E2E8F0; margin: 1.5rem 0 1rem 0; }
+  /* ── Separadores ───────────────────────────────────────────────────────── */
+  .sec-div {
+    border: none; height: 1px;
+    background: linear-gradient(90deg, transparent, #E2E8F0 20%, #E2E8F0 80%, transparent);
+    margin: 1.5rem 0 1rem 0;
+    animation: borderDraw 0.5s ease-out forwards;
+  }
 
-  /* Bloque genérico CIPS */
+  /* ── Bloques CIPS ──────────────────────────────────────────────────────── */
   .bloque {
     background: white; border-radius: 14px; padding: 1.5rem;
     box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 1rem;
+    animation: fadeUp 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
+    transition: box-shadow 0.25s ease, transform 0.25s ease;
+  }
+  .bloque:hover {
+    box-shadow: 0 8px 28px rgba(0,0,0,0.09);
+    transform: translateY(-2px);
   }
   .bloque-titulo {
     font-weight: 700; font-size: 0.85rem; color: #8B0000;
@@ -125,41 +239,85 @@ st.markdown("""
     padding-bottom: 0.5rem; border-bottom: 2px solid #F0F2F6;
   }
 
-  /* Métricas CIPS */
+  /* ── Métricas CIPS ─────────────────────────────────────────────────────── */
   [data-testid="stMetric"] {
     background: white; border-radius: 14px;
     padding: 1.2rem 1.4rem !important;
     box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+    animation: scaleIn 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  [data-testid="stMetric"]:hover {
+    transform: translateY(-3px) scale(1.01);
+    box-shadow: 0 10px 28px -6px rgba(0,0,0,0.12);
   }
   [data-testid="stMetricLabel"] {
     font-size: 0.75rem !important; color: #888 !important;
     font-weight: 600 !important; text-transform: uppercase; letter-spacing: 0.5px;
   }
-  [data-testid="stMetricValue"] { font-size: 2.2rem !important; font-weight: 800 !important; }
+  [data-testid="stMetricValue"] {
+    font-size: 2.2rem !important; font-weight: 800 !important;
+    animation: countPop 0.55s cubic-bezier(.22,.68,0,1.2) 0.15s both;
+  }
 
-  /* Botones */
+  /* ── Botones ───────────────────────────────────────────────────────────── */
   .stButton > button {
     background: linear-gradient(135deg, #b8233e, #d42848) !important;
     color: white !important; border: none !important;
     border-radius: 10px !important; font-weight: 600 !important;
     box-shadow: 0 4px 14px rgba(123,30,58,0.3) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  }
+  .stButton > button:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 8px 22px rgba(123,30,58,0.4) !important;
+  }
+  .stButton > button:active {
+    transform: translateY(0) scale(0.98) !important;
   }
   [data-testid="stDownloadButton"] > button {
     background: linear-gradient(135deg, #1A7A4A, #22A06B) !important;
     color: white !important; border: none !important;
     border-radius: 10px !important; font-weight: 600 !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  }
+  [data-testid="stDownloadButton"] > button:hover {
+    transform: translateY(-2px) scale(1.02) !important;
+    box-shadow: 0 8px 22px rgba(26,122,74,0.35) !important;
   }
 
-  /* Animaciones */
-  @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(15px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .main-header, .stat-container, .pcc-footer { animation: fadeUp 0.5s ease-out forwards; }
+  /* ── DataFrames ────────────────────────────────────────────────────────── */
   [data-testid="stDataFrame"] {
-    animation: fadeUp 0.6s ease-out forwards; border-radius: 8px;
-    border: 1px solid #E2E8F0; overflow: hidden;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    animation: fadeUp 0.55s cubic-bezier(.22,.68,0,1.2) 0.1s both;
+    border-radius: 10px; border: 1px solid #E2E8F0; overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    transition: box-shadow 0.25s ease;
+  }
+  [data-testid="stDataFrame"]:hover {
+    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+  }
+
+  /* ── Plotly charts ─────────────────────────────────────────────────────── */
+  .js-plotly-plot {
+    animation: scaleIn 0.5s cubic-bezier(.22,.68,0,1.2) 0.1s both;
+    border-radius: 10px;
+  }
+
+  /* ── Expanders ─────────────────────────────────────────────────────────── */
+  [data-testid="stExpander"] {
+    border-radius: 10px !important; border: 1px solid #E2E8F0 !important;
+    overflow: hidden;
+    transition: box-shadow 0.25s ease;
+  }
+  [data-testid="stExpander"]:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  }
+
+  /* ── Shimmer para SP sync badges ───────────────────────────────────────── */
+  .sp-badge-shimmer {
+    background: linear-gradient(90deg, #F0FFF4 25%, #dcffe8 50%, #F0FFF4 75%);
+    background-size: 400px 100%;
+    animation: shimmer 1.8s infinite;
   }
 
   #MainMenu, footer { visibility: hidden; }
@@ -312,6 +470,7 @@ CHART = dict(
     plot_bgcolor="white", paper_bgcolor="white",
     margin=dict(t=40, b=40, l=50, r=20),
     font=dict(size=12, family="'Inter', sans-serif", color="#475569"),
+    transition=dict(duration=600, easing="cubic-in-out"),
 )
 
 def apply_chart(fig, h=280, xl="Abscisa (m)", yl="", title=""):
@@ -322,16 +481,89 @@ def apply_chart(fig, h=280, xl="Abscisa (m)", yl="", title=""):
         xaxis_title=dict(text=xl, font=dict(size=11, color="#64748B")),
         yaxis_title=dict(text=yl, font=dict(size=11, color="#64748B")),
         legend=dict(orientation="h", y=-0.25, font_size=11, font_color="#475569"),
-        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter")
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter",
+                        bordercolor="#E2E8F0"),
     )
     fig.update_xaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False,
                      linecolor="#E2E8F0", linewidth=1)
     fig.update_yaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False,
                      linecolor="#E2E8F0", linewidth=1)
+    # Animación de trazos al dibujar
+    fig.update_traces(selector=dict(mode="lines+markers"),
+                      line=dict(shape="spline"),
+                      opacity=0.95)
     return fig
 
 def pbi_title(text):
     st.markdown(f'<p class="pbi-title">{text}</p>', unsafe_allow_html=True)
+
+def animated_kpi_row(items):
+    """
+    items: list de (label, value, color)
+    Renderiza KPI cards con contador JS animado.
+    """
+    cards_html = ""
+    js_counters = ""
+    for i, (label, value, color) in enumerate(items):
+        uid = f"kpi_{i}_{abs(hash(label)) % 9999}"
+        # Solo animar si el valor es numérico entero
+        if isinstance(value, int):
+            display = f'<span id="{uid}">0</span>'
+            js_counters += f"""
+            animateCounter("{uid}", {value}, 900, {i * 120});
+            """
+        else:
+            display = f'<span id="{uid}">{value}</span>'
+
+        cards_html += f"""
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;
+                    padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);
+                    border-left:4px solid {color};
+                    animation:scaleIn 0.45s cubic-bezier(.22,.68,0,1.2) {i*0.07:.2f}s both;
+                    transition:transform 0.25s ease,box-shadow 0.25s ease;cursor:default;"
+             onmouseover="this.style.transform='translateY(-4px) scale(1.01)';this.style.boxShadow='0 12px 32px -8px rgba(0,0,0,0.12)'"
+             onmouseout="this.style.transform='';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
+          <p style="font-size:0.72rem;text-transform:uppercase;font-weight:700;
+                    color:#64748B;letter-spacing:0.06em;margin:0 0 6px 0;">{label}</p>
+          <p style="font-size:1.8rem;font-weight:800;color:{color};margin:0;
+                    animation:countPop 0.55s cubic-bezier(.22,.68,0,1.2) {i*0.07+0.2:.2f}s both;">
+            {display}
+          </p>
+        </div>
+        """
+
+    full_html = f"""
+    <style>
+      @keyframes scaleIn {{
+        from {{ opacity:0; transform:scale(0.88); }}
+        to   {{ opacity:1; transform:scale(1); }}
+      }}
+      @keyframes countPop {{
+        0%  {{ transform:scale(0.6); opacity:0; }}
+        70% {{ transform:scale(1.08); }}
+        100%{{ transform:scale(1); opacity:1; }}
+      }}
+    </style>
+    <div style="display:grid;grid-template-columns:repeat({len(items)},1fr);gap:1rem;margin-bottom:1rem;">
+      {cards_html}
+    </div>
+    <script>
+    function animateCounter(id, target, duration, delay) {{
+      setTimeout(function() {{
+        var el = document.getElementById(id);
+        if (!el) return;
+        var start = 0, step = target / (duration / 16);
+        var timer = setInterval(function() {{
+          start += step;
+          if (start >= target) {{ el.textContent = target.toLocaleString(); clearInterval(timer); }}
+          else {{ el.textContent = Math.floor(start).toLocaleString(); }}
+        }}, 16);
+      }}, delay);
+    }}
+    {js_counters}
+    </script>
+    """
+    components.html(full_html, height=110)
 
 def footer():
     st.markdown("""
@@ -677,21 +909,13 @@ def render_resumen(inspecciones):
     </div>
     """, unsafe_allow_html=True)
 
-    c1,c2,c3,c4,c5 = st.columns(5)
-    for col, label, val, color in [
-        (c1, "ARCHIVOS TOTALES", len(inspecciones), "#0F172A"),
-        (c2, "TRAMOS / ZONAS",   tramos,            C_RED),
-        (c3, "ARCHIVOS PAP",     len(pap),           C_PROT),
-        (c4, "ARCHIVOS DCVG",    len(dcvg),          C_DCVG),
-        (c5, "PUNTOS TOTALES",   pts_pap+pts_dcvg,   "#0F172A"),
-    ]:
-        with col:
-            st.markdown(f"""
-            <div class="stat-container" style="border-left:4px solid {color};border-radius:8px;">
-              <p class="stat-label">{label}</p>
-              <p class="stat-val" style="color:{color};">{val}</p>
-            </div>
-            """, unsafe_allow_html=True)
+    animated_kpi_row([
+        ("Archivos totales", len(inspecciones),      "#0F172A"),
+        ("Tramos / Zonas",   tramos,                 C_RED),
+        ("Archivos PAP",     len(pap),               C_PROT),
+        ("Archivos DCVG",    len(dcvg),              C_DCVG),
+        ("Puntos totales",   pts_pap + pts_dcvg,     "#0F172A"),
+    ])
 
     divider()
     pbi_title("Mapa global — todos los puntos")
@@ -940,11 +1164,12 @@ def render_cips(distrito, linea, cliente, sp_files=None):
         sobre = int((df["Estado_CP"] == "SOBREPROTEGIDO").sum()) if "Estado_CP" in df.columns else 0
         pct   = f"{round(prot/total*100,1)}%" if total else "—"
 
-        c1, c2, c3, c4 = st.columns(4)
-        c1.metric("Puntos totales",  total)
-        c2.metric("Protegidos",      f"{prot} ({pct})")
-        c3.metric("Desprotegidos",   desp)
-        c4.metric("Sobreprotegidos", sobre)
+        animated_kpi_row([
+            ("Puntos totales",   total, "#0F172A"),
+            ("Protegidos",       prot,  C_PROT),
+            ("Desprotegidos",    desp,  C_SIN),
+            ("Sobreprotegidos",  sobre, C_SOBRE),
+        ])
 
         # Gráfica Off mV vs PK
         if "Off_mV_limpio" in df.columns and "PK_real_m" in df.columns:
