@@ -17,6 +17,8 @@ import tempfile
 import datetime
 import zipfile
 import xml.etree.ElementTree as _ET
+import gc
+import openpyxl
 
 st.set_page_config(
     page_title="PCC – Inspecciones",
@@ -436,6 +438,52 @@ CIPS_COLORS = {
 }
 
 
+def _parse_cips_hoja_sampled(file, max_pts: int = 5000):
+    """
+    Parser de hoja CIPS con memoria constante O(max_pts).
+    Usa openpyxl read_only para iterar sin cargar todo en RAM.
+    Submuestrea dinámicamente durante la iteración.
+    """
+    getattr(file, "seek", lambda x: None)(0)
+    wb = openpyxl.load_workbook(file, read_only=True, data_only=True)
+    ws = wb["CIPS"]
+
+    header    = None
+    buf       = []        # filas muestreadas
+    step      = 1         # 1 de cada 'step' filas se guarda
+    data_idx  = 0
+
+    for row in ws.iter_rows(values_only=True):
+        vals = list(row)
+        if header is None:
+            if "KILÓMETRO" in vals:
+                header = vals
+        else:
+            if data_idx % step == 0:
+                buf.append(vals)
+                # Ajustar step dinámicamente para no superar 2×max_pts en mem
+                if len(buf) >= max_pts * 2:
+                    step *= 2
+                    buf = buf[::2]
+            data_idx += 1
+
+    wb.close()
+    gc.collect()
+
+    if not header:
+        raise ValueError("No se encontró cabecera KILÓMETRO")
+
+    # Submuestra final exacta
+    if len(buf) > max_pts:
+        s = len(buf) // max_pts
+        buf = buf[::s]
+
+    df = pd.DataFrame(buf, columns=header)
+    del buf
+    gc.collect()
+    return df
+
+
 def _estado_cp(v):
     if pd.isna(v):   return "DESPROTEGIDO"
     if v <= -1200:   return "SOBREPROTEGIDO"
@@ -489,16 +537,8 @@ def load_cips_processed(file, categoria="ACTUAL"):
     # ── Formato histórico: hoja "CIPS" ───────────────────────────────────────
     if "CIPS" in xl.sheet_names and "Survey Data" not in xl.sheet_names:
         _seek = getattr(file, "seek", lambda x: None)
-        # Escanear hasta fila 15 para encontrar la fila que contiene "KILÓMETRO"
         _seek(0)
-        df_scan = pd.read_excel(file, sheet_name="CIPS", header=None, nrows=15)
-        header_row = 0
-        for idx, row in df_scan.iterrows():
-            if "KILÓMETRO" in row.values:
-                header_row = idx
-                break
-        _seek(0)
-        df = pd.read_excel(file, sheet_name="CIPS", header=header_row)
+        df = _parse_cips_hoja_sampled(file, max_pts=5000)
         # Todas las variantes conocidas de nombres de columna
         RENAME_H = {
             "KILÓMETRO":                   "PK_geom_m",
@@ -514,8 +554,6 @@ def load_cips_processed(file, categoria="ACTUAL"):
         df = df.rename(columns={k: v for k, v in RENAME_H.items() if k in df.columns})
         if "PK_geom_m" in df.columns:
             df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce")
-            # Los archivos históricos guardan el PK en metros directamente;
-            # solo convertir si la mediana sugiere valores en km (< 1000)
             median_pk = df["PK_geom_m"].dropna().median()
             if pd.notna(median_pk) and median_pk < 1000:
                 df["PK_geom_m"] = df["PK_geom_m"] * 1000
@@ -1910,21 +1948,32 @@ def _load_single_cips(name: str, url: str, categoria: str):
     if name in cache:
         return cache[name], None
     try:
-        r = requests.get(url, timeout=90)
+        r = requests.get(url, timeout=120)
         if not r.ok:
             return None, f"HTTP {r.status_code}"
-        f = _repair_xlsx(r.content)
+        raw = r.content
+        del r
+        gc.collect()
+        f = _repair_xlsx(raw)
+        del raw
+        gc.collect()
         f.name = name
         d = load_cips_processed(f, categoria)
-        # Submuestreo: máx 8 000 pts para vista general (reduce mem y tiempo de render)
+        del f
+        # Para FastField limitar también (históricos ya vienen con 5000 pts)
         df = d["df"]
-        if len(df) > 8000:
-            step = max(1, len(df) // 8000)
+        if len(df) > 4000:
+            step = max(1, len(df) // 4000)
             d["df"] = df.iloc[::step].reset_index(drop=True)
+        del df
+        gc.collect()
         cache[name] = d
         return d, None
+    except MemoryError:
+        gc.collect()
+        return None, "Memoria insuficiente"
     except Exception as e:
-        return None, str(e)
+        return None, str(e)[:80]
 
 
 def _sp_token():
