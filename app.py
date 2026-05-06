@@ -15,6 +15,8 @@ import os
 import sys
 import tempfile
 import datetime
+import zipfile
+import xml.etree.ElementTree as _ET
 
 st.set_page_config(
     page_title="PCC – Inspecciones",
@@ -1621,6 +1623,40 @@ def fetch_sharepoint_files():
         st.sidebar.error(f"Error SharePoint: {e}")
         return [], {}
 
+def _repair_xlsx(data: bytes) -> io.BytesIO:
+    """
+    Parchea xlsx con XML inválido (stylesheet/sharedStrings corruptos).
+    Reemplaza el archivo problemático con una versión mínima válida.
+    """
+    _MINIMAL_STYLES = (
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        b'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>'
+    )
+    _MINIMAL_STRINGS = (
+        b'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+        b'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="0" uniqueCount="0"/>'
+    )
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as zin:
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zout:
+                for item in zin.infolist():
+                    content = zin.read(item.filename)
+                    if item.filename in ("xl/styles.xml", "xl/sharedStrings.xml"):
+                        try:
+                            _ET.fromstring(content)
+                        except _ET.ParseError:
+                            if item.filename == "xl/styles.xml":
+                                content = _MINIMAL_STYLES
+                            else:
+                                content = _MINIMAL_STRINGS
+                    zout.writestr(item, content)
+            buf.seek(0)
+            return buf
+    except Exception:
+        return io.BytesIO(data)
+
+
 def _fetch_cips_folder(cfg, folder, categoria):
     """Descarga xlsx de una carpeta SharePoint, parsea y retorna lista de dicts cargados."""
     out = []
@@ -1665,20 +1701,13 @@ def _fetch_cips_folder(cfg, folder, categoria):
             if not r.ok:
                 errors.append(f"Descarga fallida {name}: HTTP {r.status_code}")
                 continue
-            f = io.BytesIO(r.content)
+            # Reparar XML inválido antes de parsear
+            f = _repair_xlsx(r.content)
             f.name = name
             try:
-                xl = pd.ExcelFile(f)
-                # Aceptar tanto archivos con "Survey Data" como cualquier otro xlsx
-                if "Survey Data" in xl.sheet_names:
-                    f.seek(0)
-                    d = load_cips_processed(f, categoria)
-                    out.append(d)
-                else:
-                    # Intentar con la primera hoja disponible
-                    f.seek(0)
-                    d = load_cips_processed(f, categoria)
-                    out.append(d)
+                f.seek(0)
+                d = load_cips_processed(f, categoria)
+                out.append(d)
             except Exception as e:
                 errors.append(f"Error leyendo {name}: {e}")
     except Exception as e:
