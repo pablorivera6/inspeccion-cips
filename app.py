@@ -610,73 +610,53 @@ def _render_pdf(pdf_url, filename="reporte.pdf"):
         <html>
         <head>
           <style>
-            body {{ margin:0; background:#f0f2f6; }}
-            #pdf-container {{
-              width:100%; height:860px; border-radius:10px; overflow:hidden;
-              box-shadow:0 2px 12px rgba(0,0,0,0.1);
+            body {{ margin:0; background:#e8eaed; }}
+            #scroll-box {{
+              width:100%; height:860px; overflow-y:auto;
+              border-radius:10px; box-shadow:0 2px 12px rgba(0,0,0,0.1);
             }}
-            canvas {{ display:block; margin:0 auto; }}
-            #controls {{
-              background:white; padding:8px 16px; display:flex;
-              align-items:center; gap:12px; font-family:Inter,sans-serif;
-              font-size:13px; border-bottom:1px solid #e2e8f0;
+            .page-wrap {{
+              display:flex; justify-content:center;
+              padding:12px 0; background:#e8eaed;
             }}
-            button {{
-              background:#D50032; color:white; border:none; border-radius:6px;
-              padding:4px 12px; cursor:pointer; font-size:13px;
+            canvas {{
+              box-shadow:0 2px 8px rgba(0,0,0,0.2);
+              border-radius:2px;
+              max-width:98%;
             }}
-            button:hover {{ background:#a00025; }}
-            #page-info {{ color:#475569; }}
           </style>
         </head>
         <body>
-          <div id="pdf-container">
-            <div id="controls">
-              <button onclick="prevPage()">&#8592;</button>
-              <span id="page-info">Cargando...</span>
-              <button onclick="nextPage()">&#8594;</button>
-            </div>
-            <canvas id="pdf-canvas" style="max-width:100%;background:white;"></canvas>
-          </div>
+          <div id="scroll-box"></div>
           <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
           <script>
             pdfjsLib.GlobalWorkerOptions.workerSrc =
               'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-            var pdfDoc = null, pageNum = 1;
             var b64 = "{b64}";
             var bin = atob(b64);
             var arr = new Uint8Array(bin.length);
             for(var i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
 
-            pdfjsLib.getDocument({{data: arr}}).promise.then(function(doc) {{
-              pdfDoc = doc;
-              renderPage(pageNum);
+            pdfjsLib.getDocument({{data:arr}}).promise.then(function(doc) {{
+              var box = document.getElementById('scroll-box');
+              var total = doc.numPages;
+              for(var n=1; n<=total; n++) {{
+                (function(num) {{
+                  doc.getPage(num).then(function(page) {{
+                    var vp = page.getViewport({{scale:1.6}});
+                    var canvas = document.createElement('canvas');
+                    canvas.height = vp.height;
+                    canvas.width  = vp.width;
+                    var wrap = document.createElement('div');
+                    wrap.className = 'page-wrap';
+                    wrap.appendChild(canvas);
+                    box.appendChild(wrap);
+                    page.render({{canvasContext:canvas.getContext('2d'), viewport:vp}});
+                  }});
+                }})(n);
+              }}
             }});
-
-            function renderPage(n) {{
-              pdfDoc.getPage(n).then(function(page) {{
-                var canvas = document.getElementById('pdf-canvas');
-                var ctx = canvas.getContext('2d');
-                var vp = page.getViewport({{scale: 1.5}});
-                canvas.height = vp.height;
-                canvas.width  = vp.width;
-                page.render({{canvasContext:ctx, viewport:vp}});
-                document.getElementById('page-info').textContent =
-                  'Página ' + n + ' de ' + pdfDoc.numPages;
-              }});
-            }}
-
-            function prevPage() {{
-              if(pageNum <= 1) return;
-              pageNum--;
-              renderPage(pageNum);
-            }}
-            function nextPage() {{
-              if(pageNum >= pdfDoc.numPages) return;
-              pageNum++;
-              renderPage(pageNum);
-            }}
           </script>
         </body>
         </html>
