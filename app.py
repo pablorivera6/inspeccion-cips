@@ -17,8 +17,6 @@ import tempfile
 import datetime
 import zipfile
 import xml.etree.ElementTree as _ET
-import gc
-import openpyxl
 
 st.set_page_config(
     page_title="PCC – Inspecciones",
@@ -438,68 +436,6 @@ CIPS_COLORS = {
 }
 
 
-def _parse_cips_hoja_sampled(file, max_pts: int = 5000):
-    """
-    Parser de hoja CIPS. Usa calamine (Rust, 10-20× más rápido que openpyxl)
-    con fallback a openpyxl read_only si calamine no está disponible.
-    """
-    _seek = getattr(file, "seek", lambda x: None)
-
-    # ── Detectar fila de cabecera (scan rápido, 15 filas) ────────────────────
-    _seek(0)
-    try:
-        df_scan = pd.read_excel(file, sheet_name="CIPS", header=None,
-                                nrows=15, engine="calamine")
-        engine = "calamine"
-    except Exception:
-        _seek(0)
-        df_scan = pd.read_excel(file, sheet_name="CIPS", header=None, nrows=15)
-        engine = "openpyxl"
-
-    header_row = 0
-    for idx, row in df_scan.iterrows():
-        if "KILÓMETRO" in row.values:
-            header_row = idx
-            break
-
-    # ── Leer con calamine (rápido) o fallback ────────────────────────────────
-    _seek(0)
-    if engine == "calamine":
-        df = pd.read_excel(file, sheet_name="CIPS", header=header_row,
-                           engine="calamine")
-    else:
-        # Openpyxl en modo read_only + iteración con submuestra dinámica
-        _seek(0)
-        wb  = openpyxl.load_workbook(file, read_only=True, data_only=True)
-        ws  = wb["CIPS"]
-        hdr = None; buf = []; step = 1; didx = 0
-        for row in ws.iter_rows(values_only=True):
-            vals = list(row)
-            if hdr is None:
-                if "KILÓMETRO" in vals: hdr = vals
-            else:
-                if didx % step == 0:
-                    buf.append(vals)
-                    if len(buf) >= max_pts * 2:
-                        step *= 2; buf = buf[::2]
-                didx += 1
-        wb.close(); gc.collect()
-        if not hdr:
-            raise ValueError("No se encontró cabecera KILÓMETRO")
-        if len(buf) > max_pts:
-            buf = buf[::len(buf)//max_pts]
-        df = pd.DataFrame(buf, columns=hdr)
-        del buf; gc.collect()
-        return df
-
-    # ── Submuestra el DataFrame (calamine ya lo tiene en RAM, es pequeño) ────
-    if len(df) > max_pts:
-        step = len(df) // max_pts
-        df = df.iloc[::step].reset_index(drop=True)
-    gc.collect()
-    return df
-
-
 def _estado_cp(v):
     if pd.isna(v):   return "DESPROTEGIDO"
     if v <= -1200:   return "SOBREPROTEGIDO"
@@ -552,27 +488,27 @@ def load_cips_processed(file, categoria="ACTUAL"):
 
     # ── Formato histórico: hoja "CIPS" ───────────────────────────────────────
     if "CIPS" in xl.sheet_names and "Survey Data" not in xl.sheet_names:
+        # Auto-detectar fila de cabecera: probar header=0 y 1
         _seek = getattr(file, "seek", lambda x: None)
         _seek(0)
-        df = _parse_cips_hoja_sampled(file, max_pts=5000)
+        df0 = pd.read_excel(file, sheet_name="CIPS", header=0, nrows=1)
+        _seek(0)
+        header_row = 0 if "KILÓMETRO" in df0.columns else 1
+        df = pd.read_excel(file, sheet_name="CIPS", header=header_row)
         # Todas las variantes conocidas de nombres de columna
         RENAME_H = {
-            "KILÓMETRO":                   "PK_geom_m",
-            "Von [V/CSE]":                 "On_mV_limpio",
-            "Voff [V/CSE]":                "Off_mV_limpio",
-            "POTENCIAL ON [VCSE]":         "On_mV_limpio",
+            "KILÓMETRO":                  "PK_geom_m",
+            "Von [V/CSE]":                "On_mV_limpio",
+            "Voff [V/CSE]":               "Off_mV_limpio",
+            "POTENCIAL ON [VCSE]":        "On_mV_limpio",
             "POTENCIAL INSTANT OFF [VCSE]":"Off_mV_limpio",
-            "LATITUD":                     "Lat_corr",
-            "LONGITUD":                    "Long_corr",
-            "ALTITUD":                     "Altitud",
-            "OBSERVACIONES":               "Comentario",
+            "LATITUD":                    "Lat_corr",
+            "LONGITUD":                   "Long_corr",
+            "ALTITUD":                    "Altitud",
         }
         df = df.rename(columns={k: v for k, v in RENAME_H.items() if k in df.columns})
         if "PK_geom_m" in df.columns:
-            df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce")
-            median_pk = df["PK_geom_m"].dropna().median()
-            if pd.notna(median_pk) and median_pk < 1000:
-                df["PK_geom_m"] = df["PK_geom_m"] * 1000
+            df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce") * 1000
         df = _finalizar_df(df)
         df = df.dropna(subset=["PK_geom_m", "Off_mV_limpio"], how="all")
         if fecha == "—":
@@ -1901,12 +1837,9 @@ def _repair_xlsx(data: bytes) -> io.BytesIO:
         return io.BytesIO(data)
 
 
-@st.cache_data(ttl=600, show_spinner="Buscando archivos en SharePoint...")
-def fetch_cips_metadata():
-    """Solo obtiene lista de archivos (nombre + URL). No descarga datos. Muy rápido."""
-    if "sharepoint" not in st.secrets:
-        return [], [], ["No hay configuración de SharePoint"]
-    cfg = st.secrets["sharepoint"]
+def _fetch_cips_folder(cfg, folder, categoria):
+    """Descarga xlsx de una carpeta SharePoint, parsea y retorna lista de dicts cargados."""
+    out = []
     errors = []
     try:
         app_obj = msal.ConfidentialClientApplication(
@@ -1914,82 +1847,65 @@ def fetch_cips_metadata():
             authority=f"https://login.microsoftonline.com/{cfg['tenant_id']}",
             client_credential=cfg["client_secret"],
         )
-        token = app_obj.acquire_token_for_client(
+        token_resp = app_obj.acquire_token_for_client(
             scopes=["https://graph.microsoft.com/.default"]
-        ).get("access_token")
+        )
+        token = token_resp.get("access_token")
         if not token:
-            return [], [], ["No se pudo autenticar con SharePoint"]
+            errors.append(f"No token: {token_resp.get('error_description','')}")
+            return out, errors
         headers  = {"Authorization": f"Bearer {token}"}
         hostname = f"{cfg['tenant_name']}.sharepoint.com"
         site_path = cfg["site_url"].replace(f"https://{hostname}", "")
-        site_id = requests.get(
+        site_resp = requests.get(
             f"https://graph.microsoft.com/v1.0/sites/{hostname}:{site_path}",
             headers=headers
-        ).json().get("id")
+        ).json()
+        site_id = site_resp.get("id")
         if not site_id:
-            return [], [], ["Site SharePoint no encontrado"]
-
-        def _list(folder, categoria):
-            resp = requests.get(
-                f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{folder}:/children",
-                headers=headers
-            ).json()
-            items = resp.get("value", [])
-            if not items and "error" in resp:
-                errors.append(f"Carpeta '{folder}': {resp['error'].get('message','')}")
-            return [
-                {"name": it["name"], "url": it["@microsoft.graph.downloadUrl"], "categoria": categoria}
-                for it in items
-                if it.get("name","").endswith(".xlsx")
-                   and not it.get("name","").startswith("~")
-                   and it.get("@microsoft.graph.downloadUrl")
-            ]
-
-        actual_f = cfg.get("cips_actual_folder",     "Inspecciones Ocensa/CIPS ACTUAL")
-        hist_f   = cfg.get("cips_historicos_folder", "Inspecciones Ocensa/CIPS HISTORICOS")
-        return _list(actual_f, "ACTUAL"), _list(hist_f, "HISTÓRICO"), errors
+            errors.append(f"Site no encontrado: {site_resp.get('error',{}).get('message','')}")
+            return out, errors
+        items_resp = requests.get(
+            f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{folder}:/children",
+            headers=headers
+        ).json()
+        items = items_resp.get("value", [])
+        if not items and "error" in items_resp:
+            errors.append(f"Carpeta '{folder}': {items_resp['error'].get('message','')}")
+        for item in items:
+            name  = item.get("name", "")
+            d_url = item.get("@microsoft.graph.downloadUrl")
+            if not name.endswith(".xlsx") or name.startswith("~") or not d_url:
+                continue
+            r = requests.get(d_url)
+            if not r.ok:
+                errors.append(f"Descarga fallida {name}: HTTP {r.status_code}")
+                continue
+            # Reparar XML inválido antes de parsear
+            f = _repair_xlsx(r.content)
+            f.name = name
+            try:
+                f.seek(0)
+                d = load_cips_processed(f, categoria)
+                out.append(d)
+            except Exception as e:
+                errors.append(f"Error leyendo {name}: {e}")
     except Exception as e:
-        return [], [], [str(e)]
+        errors.append(f"Error general: {e}")
+    return out, errors
 
 
-def _cips_session_cache():
-    if "cips_files" not in st.session_state:
-        st.session_state.cips_files = {}   # name → loaded dict
-    return st.session_state.cips_files
-
-
-def _load_single_cips(name: str, url: str, categoria: str):
-    """Descarga y parsea UN archivo. Usa session_state como caché (no re-descarga)."""
-    cache = _cips_session_cache()
-    if name in cache:
-        return cache[name], None
-    try:
-        r = requests.get(url, timeout=120)
-        if not r.ok:
-            return None, f"HTTP {r.status_code}"
-        raw = r.content
-        del r
-        gc.collect()
-        f = _repair_xlsx(raw)
-        del raw
-        gc.collect()
-        f.name = name
-        d = load_cips_processed(f, categoria)
-        del f
-        # Para FastField limitar también (históricos ya vienen con 5000 pts)
-        df = d["df"]
-        if len(df) > 4000:
-            step = max(1, len(df) // 4000)
-            d["df"] = df.iloc[::step].reset_index(drop=True)
-        del df
-        gc.collect()
-        cache[name] = d
-        return d, None
-    except MemoryError:
-        gc.collect()
-        return None, "Memoria insuficiente"
-    except Exception as e:
-        return None, str(e)[:80]
+@st.cache_data(ttl=600, show_spinner="Sincronizando CIPS desde SharePoint...")
+def fetch_cips_results():
+    """Carga CIPS ACTUAL e HISTÓRICOS desde SharePoint. Retorna (actual_list, historico_list, errores)."""
+    if "sharepoint" not in st.secrets:
+        return [], [], ["No hay configuración de SharePoint"]
+    cfg = st.secrets["sharepoint"]
+    actual_folder     = cfg.get("cips_actual_folder",     "Inspecciones Ocensa/CIPS ACTUAL")
+    historicos_folder = cfg.get("cips_historicos_folder", "Inspecciones Ocensa/CIPS HISTORICOS")
+    actual,    errs_a = _fetch_cips_folder(cfg, actual_folder,     "ACTUAL")
+    historicos, errs_h = _fetch_cips_folder(cfg, historicos_folder, "HISTÓRICO")
+    return actual, historicos, errs_a + errs_h
 
 
 def _sp_token():
@@ -2098,52 +2014,23 @@ def sidebar():
         else:  # CIPS
             st.markdown('<hr style="border-color:#E2E8F0;margin:0.8rem 0;">', unsafe_allow_html=True)
 
-            # 1. Obtener lista de archivos (rápido: solo nombres + URLs)
-            actual_meta, hist_meta, meta_errors = fetch_cips_metadata()
-            for err in meta_errors[:2]:
-                st.warning(f"⚠ {err}", icon=None)
+            # SP sync automático — retorna datos ya cargados (no BytesIO)
+            actual_list, historico_list, sp_errors = fetch_cips_results()
 
-            all_meta = [(m, "ACTUAL") for m in actual_meta] + \
-                       [(m, "HISTÓRICO") for m in hist_meta]
+            # Mostrar errores de sync si existen
+            if sp_errors:
+                for err in sp_errors[:3]:
+                    st.warning(f"⚠ {err}", icon=None)
 
-            # 2. Cargar archivos uno a uno con progreso (usa session_state como caché)
-            cache = _cips_session_cache()
-            pending = [m for m, _ in all_meta if m["name"] not in cache]
-
-            if pending:
-                prog = st.progress(0, text=f"Cargando {len(pending)} archivo(s)…")
-                loaded_so_far = len(cache)
-                total = loaded_so_far + len(pending)
-                for m, cat in all_meta:
-                    if m["name"] in cache:
-                        continue
-                    prog.progress(
-                        (loaded_so_far) / max(total, 1),
-                        text=f"⬇ {m['name'][:30]}…"
-                    )
-                    _, err = _load_single_cips(m["name"], m["url"], cat)
-                    if err:
-                        st.warning(f"⚠ {m['name'][:25]}: {err}", icon=None)
-                    loaded_so_far += 1
-                prog.progress(1.0, text="✓ Sincronización completa")
-                prog.empty()
-
-            # 3. Construir listas desde caché
-            actual_list, historico_list = [], []
-            for m, cat in all_meta:
-                d = cache.get(m["name"])
-                if d:
-                    if cat == "ACTUAL":     actual_list.append(d)
-                    else:                   historico_list.append(d)
-
-            # 4. Archivos subidos manualmente
-            st.markdown('<p style="font-size:0.75rem;font-weight:600;color:#475569;'
-                        'margin:0.4rem 0 0.2rem;">SUBIR ARCHIVOS ADICIONALES</p>',
+            # Upload manual (opcional)
+            st.markdown('<p style="font-size:0.75rem;font-weight:600;color:#475569;margin:0.3rem 0 0.3rem;">SUBIR ARCHIVOS ADICIONALES</p>',
                         unsafe_allow_html=True)
             uploaded_cips = st.file_uploader("Excel CIPS", type=["xlsx"],
                                               accept_multiple_files=True,
                                               label_visibility="collapsed",
                                               key="cips_uploader")
+
+            # Agregar archivos subidos manualmente → ACTUAL por defecto
             nombres_sp = {d["tramo"] for d in actual_list + historico_list}
             for f in (uploaded_cips or []):
                 try:
@@ -2154,31 +2041,29 @@ def sidebar():
                 except Exception:
                     pass
 
-            # 5. Lista de archivos en sidebar
+            # Mostrar en sidebar agrupado
             if actual_list or historico_list:
-                st.markdown('<hr style="border-color:#E0E0E0;margin:0.5rem 0;">', unsafe_allow_html=True)
+                st.markdown('<hr style="border-color:#E0E0E0;margin:0.6rem 0;">', unsafe_allow_html=True)
                 for label, lst, color in [("ACTUALES", actual_list, "#D50032"),
                                            ("HISTÓRICOS", historico_list, "#6B7280")]:
                     if not lst: continue
                     st.markdown(f'<p style="font-size:0.67rem;color:{color};font-weight:700;'
-                                f'letter-spacing:0.08em;margin:0.5rem 0 0.2rem;">{label}</p>',
+                                f'letter-spacing:0.08em;margin:0.7rem 0 0.2rem;">{label}</p>',
                                 unsafe_allow_html=True)
                     for d in lst:
                         st.markdown(f"""
                         <div style="background:white;border:1px solid #E2E8F0;border-radius:6px;
-                                    padding:0.45rem 0.7rem;margin:3px 0;border-left:3px solid {color};">
-                          <div style="font-size:0.8rem;font-weight:600;color:#0F172A;">
+                                    padding:0.5rem 0.8rem;margin:3px 0;border-left:3px solid {color};">
+                          <div style="font-size:0.82rem;font-weight:600;color:#0F172A;">
                             {d['tramo'][:28]}
                           </div>
-                          <div style="font-size:0.7rem;color:#64748B;margin-top:1px;">
+                          <div style="font-size:0.72rem;color:#64748B;margin-top:2px;">
                             {d['fecha']} · {len(d['df']):,} pts
                           </div>
                         </div>""", unsafe_allow_html=True)
 
             if st.button("Refrescar SharePoint", use_container_width=True, key="cips_refresh"):
-                fetch_cips_metadata.clear()
-                st.session_state.pop("cips_files", None)
-                st.rerun()
+                fetch_cips_results.clear(); st.rerun()
 
             return modo, None, None, None, None, (actual_list, historico_list)
 
