@@ -340,72 +340,107 @@ st.markdown("""
   #MainMenu, footer { visibility: hidden; }
   [data-testid="stToolbar"] { visibility: hidden; }
 
-  /* ── CIPS: tema oscuro ─────────────────────────────────────────────────── */
-  .cips-canvas {
-    background: #0F172A; border-radius: 16px;
-    padding: 1.6rem 1.8rem; margin-bottom: 1rem;
+  /* ── CIPS: estilo limpio ───────────────────────────────────────────────── */
+  @keyframes cips-fadeUp {
+    from { opacity:0; transform:translateY(16px); }
+    to   { opacity:1; transform:translateY(0); }
   }
+  @keyframes cips-barGrow {
+    from { clip-path: inset(0 100% 0 0); }
+    to   { clip-path: inset(0 0% 0 0); }
+  }
+  @keyframes cips-countPop {
+    0%   { transform:scale(0.7); opacity:0; }
+    70%  { transform:scale(1.06); }
+    100% { transform:scale(1);   opacity:1; }
+  }
+
   .cips-kpi-card {
-    background: #1E293B; border: 1px solid #334155; border-radius: 10px;
+    background: white; border: 1px solid #E2E8F0; border-radius: 12px;
     padding: 1rem 1.2rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    animation: cips-fadeUp 0.45s cubic-bezier(.22,.68,0,1.2) both;
     transition: transform 0.2s ease, box-shadow 0.2s ease;
   }
   .cips-kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
   }
+  .cips-kpi-card:nth-child(1) { animation-delay:0.05s; }
+  .cips-kpi-card:nth-child(2) { animation-delay:0.12s; }
+  .cips-kpi-card:nth-child(3) { animation-delay:0.19s; }
+  .cips-kpi-card:nth-child(4) { animation-delay:0.26s; }
+  .cips-kpi-card:nth-child(5) { animation-delay:0.33s; }
+
   .cips-label {
-    font-size: 0.62rem; font-weight: 700; color: #64748B;
+    font-size: 0.62rem; font-weight: 700; color: #94A3B8;
     text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px;
   }
   .cips-value {
-    font-size: 1.8rem; font-weight: 800; color: #F1F5F9;
+    font-size: 1.8rem; font-weight: 800; color: #0F172A;
     font-variant-numeric: tabular-nums; line-height: 1;
+    animation: cips-countPop 0.5s cubic-bezier(.22,.68,0,1.2) 0.3s both;
   }
-  .cips-sub { font-size: 0.72rem; color: #64748B; margin-top: 3px; }
+  .cips-sub { font-size: 0.72rem; color: #94A3B8; margin-top: 4px; }
+
   .cips-section-title {
-    font-size: 0.7rem; font-weight: 700; color: #64748B;
+    font-size: 0.68rem; font-weight: 700; color: #475569;
     text-transform: uppercase; letter-spacing: 0.14em;
-    margin: 1.4rem 0 0.7rem; padding-left: 9px;
+    margin: 1.6rem 0 0.8rem; padding-left: 10px;
     border-left: 3px solid #D50032;
+    animation: cips-fadeUp 0.4s ease both;
   }
 
   /* Ranking bars */
   .cips-bar-row {
     display: flex; flex-direction: column; gap: 2px;
-    margin-bottom: 0.8rem;
+    margin-bottom: 1rem;
+    animation: cips-fadeUp 0.45s cubic-bezier(.22,.68,0,1.2) both;
   }
   .cips-bar-header {
-    display: flex; justify-content: space-between; align-items: baseline;
-    margin-bottom: 4px;
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 5px;
   }
   .cips-bar-name {
-    font-size: 0.82rem; font-weight: 600; color: #CBD5E1;
+    font-size: 0.84rem; font-weight: 600; color: #1E293B;
   }
   .cips-bar-score {
-    font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums;
   }
   .cips-bar-track {
-    height: 18px; border-radius: 4px; background: #273549;
+    height: 14px; border-radius: 6px; background: #F1F5F9;
     overflow: hidden; display: flex;
   }
   .cips-bar-seg {
-    height: 100%; transition: width 0.6s ease;
+    height: 100%;
+    animation: cips-barGrow 0.8s cubic-bezier(.22,.68,0,1.2) 0.2s both;
   }
   .cips-bar-legend {
-    display: flex; gap: 1rem; margin-top: 0.5rem;
-    font-size: 0.65rem; color: #64748B;
+    display: flex; gap: 1rem; margin-top: 0.6rem;
+    font-size: 0.65rem; color: #94A3B8;
   }
   .cips-bar-legend span { display: flex; align-items: center; gap: 4px; }
   .cips-dot {
     width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+    flex-shrink: 0;
   }
 
-  /* Badges nivel */
-  .badge-critico  { background:#450a0a; color:#fca5a5; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
-  .badge-moderado { background:#451a03; color:#fde68a; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
-  .badge-bajo     { background:#052e16; color:#86efac; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
-  .badge-sin      { background:#1e293b; color:#64748b; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:600; }
+  /* Badges nivel — colores limpios sobre fondo claro */
+  .badge-critico  { background:#FEE2E2; color:#991B1B; padding:3px 10px; border-radius:20px; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
+  .badge-moderado { background:#FEF3C7; color:#92400E; padding:3px 10px; border-radius:20px; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
+  .badge-bajo     { background:#DCFCE7; color:#166534; padding:3px 10px; border-radius:20px; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
+
+  /* Tabla CIPS */
+  .cips-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+  .cips-table th {
+    text-align:left; padding:8px 12px;
+    font-size:0.63rem; font-weight:700; color:#94A3B8;
+    text-transform:uppercase; letter-spacing:0.1em;
+    border-bottom: 2px solid #E2E8F0; background:#FAFAFA;
+  }
+  .cips-table td { padding:9px 12px; border-bottom:1px solid #F1F5F9; color:#374151; }
+  .cips-table tr { animation: cips-fadeUp 0.4s ease both; }
+  .cips-table tr:hover td { background:#F8FAFC; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1330,33 +1365,35 @@ def render_cips_comparativo(actual_list, historico_list):
     score_top         = stats[0]["score"] if stats else 0
 
     # ── Canvas oscuro ──────────────────────────────────────────────────────────
-    st.markdown('<div class="cips-canvas">', unsafe_allow_html=True)
-
     # ── Cabecera ───────────────────────────────────────────────────────────────
     st.markdown(f"""
-    <div style="display:flex;align-items:center;justify-content:space-between;
-                flex-wrap:wrap;gap:0.6rem;margin-bottom:1.2rem;">
+    <div style="background:white;border:1px solid #E2E8F0;border-radius:14px;
+                border-left:4px solid #D50032;padding:1.1rem 1.6rem;
+                box-shadow:0 2px 10px rgba(0,0,0,0.04);
+                display:flex;align-items:center;justify-content:space-between;
+                flex-wrap:wrap;gap:0.8rem;margin-bottom:1.2rem;
+                animation:cips-fadeUp 0.5s cubic-bezier(.22,.68,0,1.2) both;">
       <div>
         <div style="font-size:0.62rem;color:#D50032;font-weight:700;
-                    text-transform:uppercase;letter-spacing:0.14em;">
+                    text-transform:uppercase;letter-spacing:0.14em;margin-bottom:3px;">
           PCC Integrity · CIPS
         </div>
-        <div style="font-size:1.4rem;font-weight:800;color:#F1F5F9;margin-top:2px;">
+        <div style="font-size:1.3rem;font-weight:800;color:#0F172A;">
           Inspecciones — Vista Comparativa
         </div>
       </div>
       <div style="display:flex;gap:0.6rem;">
-        <div style="background:#1E293B;border:1px solid #334155;border-radius:8px;
+        <div style="background:#FFF5F6;border:1px solid #FECDD3;border-radius:8px;
                     padding:0.5rem 0.9rem;text-align:center;">
           <div style="font-size:1.1rem;font-weight:800;color:#D50032;">{len(actual_list)}</div>
-          <div style="font-size:0.6rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
-          <div style="font-size:0.65rem;color:#94A3B8;">{n_act:,} pts</div>
+          <div style="font-size:0.6rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
+          <div style="font-size:0.65rem;color:#D50032;font-weight:600;">{n_act:,} pts</div>
         </div>
-        <div style="background:#1E293B;border:1px solid #334155;border-radius:8px;
+        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;
                     padding:0.5rem 0.9rem;text-align:center;">
-          <div style="font-size:1.1rem;font-weight:800;color:#94A3B8;">{len(historico_list)}</div>
-          <div style="font-size:0.6rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Históricos</div>
-          <div style="font-size:0.65rem;color:#94A3B8;">{n_his:,} pts</div>
+          <div style="font-size:1.1rem;font-weight:800;color:#475569;">{len(historico_list)}</div>
+          <div style="font-size:0.6rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;">Históricos</div>
+          <div style="font-size:0.65rem;color:#64748B;">{n_his:,} pts</div>
         </div>
       </div>
     </div>
@@ -1364,24 +1401,20 @@ def render_cips_comparativo(actual_list, historico_list):
 
     # ── KPI row (5 cards) ──────────────────────────────────────────────────────
     c1, c2, c3, c4, c5 = st.columns(5)
-    _kpi = lambda label, val, sub="", accent="#F1F5F9", left_border="": (
-        f'<div class="cips-kpi-card" style="border-left:4px solid {left_border};">'
-        f'<div class="cips-label">{label}</div>'
-        f'<div class="cips-value" style="color:{accent};">{val}</div>'
-        f'<div class="cips-sub">{sub}</div></div>'
-        if left_border else
-        f'<div class="cips-kpi-card">'
-        f'<div class="cips-label">{label}</div>'
-        f'<div class="cips-value" style="color:{accent};">{val}</div>'
-        f'<div class="cips-sub">{sub}</div></div>'
-    )
+
+    def _kpi(label, val, sub="", accent="#0F172A", border_color=""):
+        border_style = f"border-left:4px solid {border_color};" if border_color else ""
+        return (f'<div class="cips-kpi-card" style="{border_style}">'
+                f'<div class="cips-label">{label}</div>'
+                f'<div class="cips-value" style="color:{accent};">{val}</div>'
+                f'<div class="cips-sub">{sub}</div></div>')
+
     with c1:
         st.markdown(_kpi("Tramos", len(stats), f"{n_total_pts:,} pts totales"), unsafe_allow_html=True)
     with c2:
         col = CIPS_CRIT if n_criticos > 0 else CIPS_OK
-        st.markdown(_kpi("Tramos críticos", n_criticos,
-                         "score ≥ 50", col, CIPS_CRIT if n_criticos else CIPS_OK),
-                    unsafe_allow_html=True)
+        st.markdown(_kpi("Tramos críticos", n_criticos, "score ≥ 50", col,
+                         CIPS_CRIT if n_criticos else CIPS_OK), unsafe_allow_html=True)
     with c3:
         col = CIPS_CRIT if pct_fuera_global > 30 else (CIPS_WARN if pct_fuera_global > 10 else CIPS_OK)
         st.markdown(_kpi("Fuera de rango", f"{pct_fuera_global:.1f}%",
@@ -1389,12 +1422,11 @@ def render_cips_comparativo(actual_list, historico_list):
     with c4:
         pct_ok = 100 - pct_fuera_global
         col = CIPS_OK if pct_ok > 70 else CIPS_WARN
-        st.markdown(_kpi("En criterio", f"{pct_ok:.1f}%", "protegido −850 a −1200 mV", col),
-                    unsafe_allow_html=True)
+        st.markdown(_kpi("En criterio", f"{pct_ok:.1f}%",
+                         "protegido −850 a −1200 mV", col), unsafe_allow_html=True)
     with c5:
-        st.markdown(_kpi("Tramo más crítico", tramo_top[:22],
-                         f"score {score_top:.0f}", CIPS_CRIT, CIPS_CRIT),
-                    unsafe_allow_html=True)
+        st.markdown(_kpi("Tramo más crítico", tramo_top[:20],
+                         f"score {score_top:.0f}", CIPS_CRIT, CIPS_CRIT), unsafe_allow_html=True)
 
     # ── Layout dos columnas: ranking | mapa ────────────────────────────────────
     col_rank, col_map = st.columns([4, 5], gap="medium")
@@ -1474,8 +1506,8 @@ def render_cips_comparativo(actual_list, historico_list):
                 paper_bgcolor="rgba(0,0,0,0)",
                 plot_bgcolor="rgba(0,0,0,0)",
                 legend=dict(x=0.01, y=0.99,
-                            bgcolor="rgba(15,23,42,0.88)", font_color="#F1F5F9",
-                            bordercolor="#334155", borderwidth=1, font_size=11),
+                            bgcolor="rgba(255,255,255,0.95)", font_color="#1E293B",
+                            bordercolor="#E2E8F0", borderwidth=1, font_size=11),
             )
             st.plotly_chart(fig_map, use_container_width=True)
         else:
@@ -1539,22 +1571,22 @@ def render_cips_comparativo(actual_list, historico_list):
 
         fig.update_layout(
             height=380,
-            plot_bgcolor="rgba(15,23,42,0.7)",
-            paper_bgcolor="rgba(30,41,59,0.5)",
-            margin=dict(t=30, b=50, l=50, r=20),
-            font=dict(size=11, family="'Inter', sans-serif", color="#94A3B8"),
-            xaxis_title=dict(text="PK (m)", font=dict(size=11, color="#94A3B8")),
-            yaxis_title=dict(text="Off mV", font=dict(size=11, color="#94A3B8")),
-            legend=dict(orientation="h", y=-0.25, font_size=10,
-                        bgcolor="rgba(0,0,0,0)", font_color="#94A3B8"),
+            plot_bgcolor="white",
+            paper_bgcolor="white",
+            margin=dict(t=30, b=60, l=55, r=20),
+            font=dict(size=11, family="'Inter', sans-serif", color="#475569"),
+            xaxis_title=dict(text="PK (m)", font=dict(size=11, color="#64748B")),
+            yaxis_title=dict(text="Off mV", font=dict(size=11, color="#64748B")),
+            legend=dict(orientation="h", y=-0.3, font_size=10,
+                        bgcolor="rgba(0,0,0,0)", font_color="#64748B"),
             hovermode="x unified",
-            hoverlabel=dict(bgcolor="#1E293B", font_size=12,
-                            font_family="Inter", bordercolor="#334155"),
+            hoverlabel=dict(bgcolor="white", font_size=12,
+                            font_family="Inter", bordercolor="#E2E8F0"),
         )
-        fig.update_xaxes(showgrid=True, gridcolor="#273549", zeroline=False,
-                         tickfont=dict(color="#64748B"))
-        fig.update_yaxes(showgrid=True, gridcolor="#273549", zeroline=False,
-                         tickfont=dict(color="#64748B"))
+        fig.update_xaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False,
+                         tickfont=dict(color="#94A3B8"), linecolor="#E2E8F0")
+        fig.update_yaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False,
+                         tickfont=dict(color="#94A3B8"))
         st.plotly_chart(fig, use_container_width=True)
 
     # ── Tabla detallada ────────────────────────────────────────────────────────
@@ -1580,7 +1612,7 @@ def render_cips_comparativo(actual_list, historico_list):
         for r in stats:
             score_col = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
             rows_html += f"""
-            <tr style="border-bottom:1px solid #273549;color:#CBD5E1;">
+            <tr style="border-bottom:1px solid #F1F5F9;color:#374151;">
               <td style="padding:7px 10px;font-weight:600;">{r['tramo']}</td>
               <td style="text-align:right;padding:7px 8px;color:#64748B;
                          font-variant-numeric:tabular-nums;">{r['total']:,}</td>
@@ -1597,7 +1629,6 @@ def render_cips_comparativo(actual_list, historico_list):
         rows_html += "</tbody></table></div>"
         st.markdown(rows_html, unsafe_allow_html=True)
 
-    st.markdown('</div>', unsafe_allow_html=True)  # cierra .cips-canvas
 
 
 # ══════════════════════════════════════════════════════════════════════════════
