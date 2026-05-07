@@ -284,29 +284,22 @@ st.markdown("""
 
   /* ── Botones ───────────────────────────────────────────────────────────── */
   .stButton > button {
-    background: linear-gradient(135deg, #b8233e, #d42848) !important;
+    background: #D50032 !important;
     color: white !important; border: none !important;
-    border-radius: 10px !important; font-weight: 600 !important;
-    box-shadow: 0 4px 14px rgba(123,30,58,0.3) !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    border-radius: 6px !important; font-weight: 600 !important;
+    padding: 0.4rem 1.1rem !important;
+    transition: opacity 0.15s ease !important;
   }
-  .stButton > button:hover {
-    transform: translateY(-2px) scale(1.02) !important;
-    box-shadow: 0 8px 22px rgba(123,30,58,0.4) !important;
-  }
-  .stButton > button:active {
-    transform: translateY(0) scale(0.98) !important;
-  }
+  .stButton > button:hover { opacity: 0.88 !important; }
+  .stButton > button:active { opacity: 0.75 !important; }
   [data-testid="stDownloadButton"] > button {
-    background: linear-gradient(135deg, #1A7A4A, #22A06B) !important;
+    background: #16A34A !important;
     color: white !important; border: none !important;
-    border-radius: 10px !important; font-weight: 600 !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    border-radius: 6px !important; font-weight: 600 !important;
+    padding: 0.4rem 1.1rem !important;
+    transition: opacity 0.15s ease !important;
   }
-  [data-testid="stDownloadButton"] > button:hover {
-    transform: translateY(-2px) scale(1.02) !important;
-    box-shadow: 0 8px 22px rgba(26,122,74,0.35) !important;
-  }
+  [data-testid="stDownloadButton"] > button:hover { opacity: 0.88 !important; }
 
   /* ── DataFrames ────────────────────────────────────────────────────────── */
   [data-testid="stDataFrame"] {
@@ -1443,7 +1436,7 @@ def render_cips_comparativo(actual_list, historico_list):
                          delay="0.05s"), unsafe_allow_html=True)
     with c2:
         col = CIPS_CRIT if n_criticos > 0 else CIPS_OK
-        st.markdown(_kpi("Tramos críticos", n_criticos, "score ≥ 50", col,
+        st.markdown(_kpi("Tramos críticos", n_criticos, "nivel crítico",
                          CIPS_CRIT if n_criticos else CIPS_OK, delay="0.12s"),
                     unsafe_allow_html=True)
     with c3:
@@ -1458,8 +1451,9 @@ def render_cips_comparativo(actual_list, historico_list):
                          "protegido −850 a −1200 mV", col, delay="0.26s"),
                     unsafe_allow_html=True)
     with c5:
+        desp_top = stats[0]["pct_desp"] if stats else 0
         st.markdown(_kpi("Tramo más crítico", tramo_top[:20],
-                         f"score {score_top:.0f}", CIPS_CRIT, CIPS_CRIT, delay="0.33s"),
+                         f"{desp_top:.1f}% desprotegido", CIPS_CRIT, CIPS_CRIT, delay="0.33s"),
                     unsafe_allow_html=True)
 
     # ── Layout dos columnas: ranking | mapa ────────────────────────────────────
@@ -1473,16 +1467,12 @@ def render_cips_comparativo(actual_list, historico_list):
             for i, r in enumerate(stats):
                 row_delay  = f"{0.15 + i * 0.08:.2f}s"
                 seg_delay  = f"{0.25 + i * 0.08:.2f}s"
-                badge      = _badge(r["score"])
-                score_col  = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
+                badge = _badge(r["score"])
                 bars_html += f"""
                 <div class="cips-bar-row" style="animation-delay:{row_delay};">
                   <div class="cips-bar-header">
                     <span class="cips-bar-name">{r['tramo']}</span>
-                    <span class="cips-bar-right">
-                      {badge}
-                      <span class="cips-bar-score" style="color:{score_col};">{r['score']:.0f}</span>
-                    </span>
+                    <span class="cips-bar-right">{badge}</span>
                   </div>
                   <div class="cips-bar-track">
                     <div class="cips-bar-seg" style="width:{r['pct_prot']:.1f}%;background:{CIPS_OK};animation-delay:{seg_delay};"></div>
@@ -1501,9 +1491,6 @@ def render_cips_comparativo(actual_list, historico_list):
               <span><span class="cips-dot" style="background:{CIPS_OK};"></span>Protegido</span>
               <span><span class="cips-dot" style="background:{CIPS_WARN};"></span>Sobreprotegido</span>
               <span><span class="cips-dot" style="background:{CIPS_CRIT};"></span>Desprotegido</span>
-              <span style="margin-left:auto;font-variant-numeric:tabular-nums;">
-                Score = %desp × 2 + %sobre
-              </span>
             </div>"""
             st.markdown(bars_html, unsafe_allow_html=True)
 
@@ -1574,8 +1561,8 @@ def render_cips_comparativo(actual_list, historico_list):
             sub = d["df"].dropna(subset=[pk]).sort_values(pk)
             if len(sub) > 2000: sub = sub.iloc[::max(1, len(sub)//2000)]
             r   = next((s for s in stats if s["tramo"] == d["tramo"]), None)
-            col = (CIPS_CRIT if r and r["score"] >= 50
-                   else CIPS_WARN if r and r["score"] >= 20
+            col = (CIPS_CRIT if r and r["pct_desp"] >= 25
+                   else CIPS_WARN if r and r["pct_sobre"] >= 15
                    else GRAY_PALETTE[i % len(GRAY_PALETTE)])
             fig.add_trace(go.Scatter(
                 x=sub[pk], y=sub["Off_mV_limpio"],
@@ -1645,13 +1632,11 @@ def render_cips_comparativo(actual_list, historico_list):
               <th class="num" style="color:#16A34A;">% Prot.</th>
               <th class="num" style="color:#D97706;">% Sobre.</th>
               <th class="num" style="color:#D50032;">% Desp.</th>
-              <th class="num">Score</th>
               <th class="center">Nivel</th>
             </tr>
           </thead>
           <tbody>"""
         for i, r in enumerate(stats):
-            score_col  = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
             row_delay  = f"{0.1 + i * 0.07:.2f}s"
             rows_html += f"""
             <tr style="animation-delay:{row_delay};">
@@ -1660,7 +1645,6 @@ def render_cips_comparativo(actual_list, historico_list):
               <td class="num" style="color:#16A34A;">{r['pct_prot']:.1f}%</td>
               <td class="num" style="color:#D97706;">{r['pct_sobre']:.1f}%</td>
               <td class="num" style="color:#D50032;">{r['pct_desp']:.1f}%</td>
-              <td class="num" style="font-weight:800;color:{score_col};">{r['score']:.0f}</td>
               <td class="center">{_badge(r['score'])}</td>
             </tr>"""
         rows_html += "</tbody></table></div>"
@@ -2285,7 +2269,7 @@ def sidebar():
                           </div>
                         </div>""", unsafe_allow_html=True)
 
-            if st.button("Refrescar SharePoint", use_container_width=True, key="cips_refresh"):
+            if st.button("Refrescar SharePoint", key="cips_refresh"):
                 fetch_cips_metadata.clear()
                 st.session_state.pop("cips_files", None)
                 st.rerun()
