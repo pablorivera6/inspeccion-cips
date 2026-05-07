@@ -15,6 +15,7 @@ import os
 import sys
 import tempfile
 import datetime
+import re
 import zipfile
 import xml.etree.ElementTree as _ET
 import gc
@@ -587,7 +588,12 @@ def _meta_from_name(nombre):
             return tramo.replace("_", " "), fecha
         except Exception:
             pass
-    return base.replace("_", " "), "—"
+    tramo = base.replace("_", " ")
+    # Quitar prefijo "correlacion / correlación" — solo es un descriptor del archivo, no del tramo
+    tramo_clean = re.sub(r'^correlaci[oó]n\s+', '', tramo, flags=re.IGNORECASE).strip()
+    if tramo_clean != tramo:
+        tramo = tramo_clean.title()
+    return tramo, "—"
 
 
 def _finalizar_df(df):
@@ -610,6 +616,12 @@ def _finalizar_df(df):
     return df
 
 
+_CIPS_COLS_KEEP = {
+    "PK_geom_m", "PK_real_m",
+    "On_mV_limpio", "Off_mV_limpio", "IR_Drop_mV_limpio",
+    "Estado_CP", "Lat_corr", "Long_corr", "Altitud",
+}
+
 def load_cips_processed(file, categoria="ACTUAL"):
     """Carga un Excel CIPS — soporta formato FastField (Survey Data) e Histórico (CIPS)."""
     nombre = getattr(file, "name", str(file))
@@ -618,31 +630,33 @@ def load_cips_processed(file, categoria="ACTUAL"):
     xl = pd.ExcelFile(file)
     getattr(file, "seek", lambda x: None)(0)
 
-    # ── Formato histórico: hoja "CIPS" ───────────────────────────────────────
-    if "CIPS" in xl.sheet_names and "Survey Data" not in xl.sheet_names:
-        # Auto-detectar fila de cabecera: probar header=0 y 1
+    # ── Formato histórico: hoja "CIPS" (detección case-insensitive) ──────────
+    _sheets_upper = {s.upper(): s for s in xl.sheet_names}
+    cips_sheet = _sheets_upper.get("CIPS")
+    if cips_sheet and "Survey Data" not in xl.sheet_names:
         _seek = getattr(file, "seek", lambda x: None)
         _seek(0)
-        df0 = pd.read_excel(file, sheet_name="CIPS", header=0, nrows=1)
+        df0 = pd.read_excel(file, sheet_name=cips_sheet, header=0, nrows=1)
         _seek(0)
         header_row = 0 if "KILÓMETRO" in df0.columns else 1
-        df = pd.read_excel(file, sheet_name="CIPS", header=header_row)
+        df = pd.read_excel(file, sheet_name=cips_sheet, header=header_row)
         # Todas las variantes conocidas de nombres de columna
         RENAME_H = {
-            "KILÓMETRO":                  "PK_geom_m",
-            "Von [V/CSE]":                "On_mV_limpio",
-            "Voff [V/CSE]":               "Off_mV_limpio",
-            "POTENCIAL ON [VCSE]":        "On_mV_limpio",
+            "KILÓMETRO":                   "PK_geom_m",
+            "Von [V/CSE]":                 "On_mV_limpio",
+            "Voff [V/CSE]":                "Off_mV_limpio",
+            "POTENCIAL ON [VCSE]":         "On_mV_limpio",
             "POTENCIAL INSTANT OFF [VCSE]":"Off_mV_limpio",
-            "LATITUD":                    "Lat_corr",
-            "LONGITUD":                   "Long_corr",
-            "ALTITUD":                    "Altitud",
+            "LATITUD":                     "Lat_corr",
+            "LONGITUD":                    "Long_corr",
+            "ALTITUD":                     "Altitud",
         }
         df = df.rename(columns={k: v for k, v in RENAME_H.items() if k in df.columns})
         if "PK_geom_m" in df.columns:
             df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce") * 1000
         df = _finalizar_df(df)
         df = df.dropna(subset=["PK_geom_m", "Off_mV_limpio"], how="all")
+        df = df[[c for c in df.columns if c in _CIPS_COLS_KEEP]]
         if fecha == "—":
             fecha = "Histórico"
         return {"df": df, "tramo": tramo, "fecha": fecha,
@@ -664,6 +678,7 @@ def load_cips_processed(file, categoria="ACTUAL"):
         if src in df.columns and dst not in df.columns:
             df = df.rename(columns={src: dst})
     df = _finalizar_df(df)
+    df = df[[c for c in df.columns if c in _CIPS_COLS_KEEP | {"Comentario", "Anomalia"}]]
     return {"df": df, "tramo": tramo, "fecha": fecha,
             "filename": nombre, "tipo": "CIPS", "categoria": categoria}
 
