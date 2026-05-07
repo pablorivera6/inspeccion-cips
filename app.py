@@ -28,19 +28,18 @@ st.set_page_config(
 
 # ── Tokens de color ────────────────────────────────────────────────────────────
 C_RED   = "#D50032"
-C_PROT  = "#1565C0"
-C_SOBRE = "#0D47A1"
-C_SIN   = "#C62828"
-C_DCVG  = "#1B5E20"
-C_CIPS  = "#6A1B9A"
+C_PROT  = "#374151"   # gris oscuro — institucional
+C_SOBRE = "#6B7280"   # gris medio
+C_SIN   = "#D50032"   # rojo — sin protección es crítico
+C_DCVG  = "#374151"
 C_GRAY  = "#F3F3F3"
 C_LINE  = "#E0E0E0"
 
 ESTADO_COLORS = {
-    "Protegido":      C_PROT,
-    "Sobreprotegido": C_SOBRE,
-    "Sin protección": C_SIN,
-    "Sin medición":   "#BDBDBD",
+    "Protegido":      "#374151",
+    "Sobreprotegido": "#6B7280",
+    "Sin protección": "#D50032",
+    "Sin medición":   "#CBD5E1",
 }
 
 # ── Tokens semánticos CIPS ─────────────────────────────────────────────────────
@@ -64,7 +63,13 @@ st.markdown("""
 
   html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
   .stApp { background: #F8FAFC; }
-  .block-container { padding: 2rem 2.5rem 1rem 2.5rem !important; max-width: 1400px; }
+  .block-container { padding: 1.8rem 2.5rem 1rem 2.5rem !important; max-width: 1600px; }
+
+  /* Scrollbar refinada */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
   /* ── Keyframes ─────────────────────────────────────────────────────────── */
   @keyframes fadeUp {
@@ -143,7 +148,7 @@ st.markdown("""
     content: '';
     position: absolute; left: 0; top: 50%; transform: translateY(-50%);
     width: 3px; height: 70%; border-radius: 4px;
-    background: linear-gradient(180deg, #D50032, #ff6b6b);
+    background: #D50032;
     animation: borderDraw 0.4s ease-out 0.2s both;
   }
 
@@ -165,7 +170,7 @@ st.markdown("""
     transform: translateY(-1px);
   }
   .main-header-title {
-    font-size: 1.3rem; font-weight: 700; color: #8B0000;
+    font-size: 1.3rem; font-weight: 700; color: #D50032;
     margin: 0; display: flex; align-items: center; gap: 0.6rem;
   }
   .main-header-meta { font-size: 0.9rem; color: #64748B; font-weight: 500; }
@@ -342,105 +347,129 @@ st.markdown("""
 
   /* ── CIPS: estilo limpio ───────────────────────────────────────────────── */
   @keyframes cips-fadeUp {
-    from { opacity:0; transform:translateY(16px); }
+    from { opacity:0; transform:translateY(14px); }
     to   { opacity:1; transform:translateY(0); }
   }
   @keyframes cips-barGrow {
-    from { clip-path: inset(0 100% 0 0); }
-    to   { clip-path: inset(0 0% 0 0); }
+    from { transform: scaleX(0); transform-origin: left; }
+    to   { transform: scaleX(1); transform-origin: left; }
   }
   @keyframes cips-countPop {
-    0%   { transform:scale(0.7); opacity:0; }
-    70%  { transform:scale(1.06); }
-    100% { transform:scale(1);   opacity:1; }
+    0%   { transform:scale(0.75); opacity:0; }
+    65%  { transform:scale(1.04); }
+    100% { transform:scale(1);    opacity:1; }
   }
 
   .cips-kpi-card {
-    background: white; border: 1px solid #E2E8F0; border-radius: 12px;
+    background: white;
+    border: 1px solid #E2E8F0;
+    border-radius: 12px;
     padding: 1rem 1.2rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
     animation: cips-fadeUp 0.45s cubic-bezier(.22,.68,0,1.2) both;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition: transform 0.2s ease, box-shadow 0.22s ease;
+    height: 100%;
   }
   .cips-kpi-card:hover {
     transform: translateY(-3px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.09);
   }
-  .cips-kpi-card:nth-child(1) { animation-delay:0.05s; }
-  .cips-kpi-card:nth-child(2) { animation-delay:0.12s; }
-  .cips-kpi-card:nth-child(3) { animation-delay:0.19s; }
-  .cips-kpi-card:nth-child(4) { animation-delay:0.26s; }
-  .cips-kpi-card:nth-child(5) { animation-delay:0.33s; }
 
   .cips-label {
-    font-size: 0.62rem; font-weight: 700; color: #94A3B8;
-    text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px;
+    font-size: 0.6rem; font-weight: 700; color: #94A3B8;
+    text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 6px;
   }
   .cips-value {
-    font-size: 1.8rem; font-weight: 800; color: #0F172A;
-    font-variant-numeric: tabular-nums; line-height: 1;
-    animation: cips-countPop 0.5s cubic-bezier(.22,.68,0,1.2) 0.3s both;
+    font-size: 1.75rem; font-weight: 800; color: #0F172A;
+    font-variant-numeric: tabular-nums; line-height: 1.1;
+    animation: cips-countPop 0.55s cubic-bezier(.22,.68,0,1.2) 0.25s both;
   }
-  .cips-sub { font-size: 0.72rem; color: #94A3B8; margin-top: 4px; }
+  .cips-sub {
+    font-size: 0.7rem; color: #94A3B8; margin-top: 5px;
+    line-height: 1.4;
+  }
 
   .cips-section-title {
-    font-size: 0.68rem; font-weight: 700; color: #475569;
-    text-transform: uppercase; letter-spacing: 0.14em;
-    margin: 1.6rem 0 0.8rem; padding-left: 10px;
+    font-size: 0.65rem; font-weight: 700; color: #64748B;
+    text-transform: uppercase; letter-spacing: 0.16em;
+    margin: 1.8rem 0 0.9rem; padding-left: 10px;
     border-left: 3px solid #D50032;
-    animation: cips-fadeUp 0.4s ease both;
+    animation: cips-fadeUp 0.35s ease both;
   }
 
   /* Ranking bars */
   .cips-bar-row {
-    display: flex; flex-direction: column; gap: 2px;
-    margin-bottom: 1rem;
+    margin-bottom: 1.1rem;
     animation: cips-fadeUp 0.45s cubic-bezier(.22,.68,0,1.2) both;
   }
   .cips-bar-header {
     display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 5px;
+    margin-bottom: 6px; gap: 8px;
   }
   .cips-bar-name {
-    font-size: 0.84rem; font-weight: 600; color: #1E293B;
+    font-size: 0.83rem; font-weight: 600; color: #1E293B;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .cips-bar-right {
+    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
   }
   .cips-bar-score {
-    font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums;
+    font-size: 0.78rem; font-weight: 800;
+    font-variant-numeric: tabular-nums; min-width: 24px;
+    text-align: right;
   }
   .cips-bar-track {
-    height: 14px; border-radius: 6px; background: #F1F5F9;
+    height: 12px; border-radius: 6px; background: #F1F5F9;
     overflow: hidden; display: flex;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
   }
   .cips-bar-seg {
     height: 100%;
-    animation: cips-barGrow 0.8s cubic-bezier(.22,.68,0,1.2) 0.2s both;
+    animation: cips-barGrow 0.75s cubic-bezier(.22,.68,0,1.2) both;
+  }
+  .cips-bar-meta {
+    font-size: 0.63rem; color: #94A3B8; margin-top: 3px;
+    letter-spacing: 0.01em;
   }
   .cips-bar-legend {
-    display: flex; gap: 1rem; margin-top: 0.6rem;
-    font-size: 0.65rem; color: #94A3B8;
+    display: flex; gap: 1.2rem; margin-top: 0.9rem;
+    font-size: 0.65rem; color: #94A3B8; flex-wrap: wrap;
   }
-  .cips-bar-legend span { display: flex; align-items: center; gap: 4px; }
+  .cips-bar-legend span { display: flex; align-items: center; gap: 5px; }
   .cips-dot {
     width: 8px; height: 8px; border-radius: 50%; display: inline-block;
     flex-shrink: 0;
   }
 
-  /* Badges nivel — colores limpios sobre fondo claro */
-  .badge-critico  { background:#FEE2E2; color:#991B1B; padding:3px 10px; border-radius:20px; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
-  .badge-moderado { background:#FEF3C7; color:#92400E; padding:3px 10px; border-radius:20px; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
-  .badge-bajo     { background:#DCFCE7; color:#166534; padding:3px 10px; border-radius:20px; font-size:0.68rem; font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
+  /* Badges nivel */
+  .badge-critico  { display:inline-block; background:#FEE2E2; color:#991B1B; padding:2px 9px; border-radius:20px; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; white-space:nowrap; }
+  .badge-moderado { display:inline-block; background:#FEF3C7; color:#92400E; padding:2px 9px; border-radius:20px; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; white-space:nowrap; }
+  .badge-bajo     { display:inline-block; background:#DCFCE7; color:#166534; padding:2px 9px; border-radius:20px; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; white-space:nowrap; }
 
   /* Tabla CIPS */
-  .cips-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
-  .cips-table th {
-    text-align:left; padding:8px 12px;
-    font-size:0.63rem; font-weight:700; color:#94A3B8;
-    text-transform:uppercase; letter-spacing:0.1em;
-    border-bottom: 2px solid #E2E8F0; background:#FAFAFA;
+  .cips-table { width:100%; border-collapse:separate; border-spacing:0; font-size:0.82rem; }
+  .cips-table thead th {
+    padding:9px 14px;
+    font-size:0.6rem; font-weight:700; color:#94A3B8;
+    text-transform:uppercase; letter-spacing:0.12em;
+    border-bottom: 2px solid #E2E8F0;
+    background: #FAFAFA;
+    position: sticky; top: 0;
   }
-  .cips-table td { padding:9px 12px; border-bottom:1px solid #F1F5F9; color:#374151; }
-  .cips-table tr { animation: cips-fadeUp 0.4s ease both; }
-  .cips-table tr:hover td { background:#F8FAFC; }
+  .cips-table thead th:first-child { border-radius:8px 0 0 0; }
+  .cips-table thead th:last-child  { border-radius:0 8px 0 0; }
+  .cips-table tbody tr { transition: background 0.15s ease; }
+  .cips-table tbody tr:hover td { background:#F8FAFC; }
+  .cips-table tbody td { padding:10px 14px; border-bottom:1px solid #F1F5F9; color:#374151; vertical-align:middle; }
+  .cips-table .num { text-align:right; font-variant-numeric:tabular-nums; font-weight:500; }
+  .cips-table .center { text-align:center; }
+  .cips-table tbody tr:last-child td { border-bottom: none; }
+
+  /* Sidebar items */
+  [data-testid="stSidebar"] .element-container { margin-bottom:0 !important; }
+  [data-testid="stSidebar"] [data-testid="stFileUploader"] {
+    background: #F8FAFC !important; border-radius: 8px !important;
+  }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1399,34 +1428,39 @@ def render_cips_comparativo(actual_list, historico_list):
     </div>
     """, unsafe_allow_html=True)
 
-    # ── KPI row (5 cards) ──────────────────────────────────────────────────────
+    # ── KPI row (5 cards) — delays inline para que funcionen en columnas Streamlit
     c1, c2, c3, c4, c5 = st.columns(5)
 
-    def _kpi(label, val, sub="", accent="#0F172A", border_color=""):
+    def _kpi(label, val, sub="", accent="#0F172A", border_color="", delay="0s"):
         border_style = f"border-left:4px solid {border_color};" if border_color else ""
-        return (f'<div class="cips-kpi-card" style="{border_style}">'
+        return (f'<div class="cips-kpi-card" style="{border_style}animation-delay:{delay};">'
                 f'<div class="cips-label">{label}</div>'
                 f'<div class="cips-value" style="color:{accent};">{val}</div>'
                 f'<div class="cips-sub">{sub}</div></div>')
 
     with c1:
-        st.markdown(_kpi("Tramos", len(stats), f"{n_total_pts:,} pts totales"), unsafe_allow_html=True)
+        st.markdown(_kpi("Tramos", len(stats), f"{n_total_pts:,} pts totales",
+                         delay="0.05s"), unsafe_allow_html=True)
     with c2:
         col = CIPS_CRIT if n_criticos > 0 else CIPS_OK
         st.markdown(_kpi("Tramos críticos", n_criticos, "score ≥ 50", col,
-                         CIPS_CRIT if n_criticos else CIPS_OK), unsafe_allow_html=True)
+                         CIPS_CRIT if n_criticos else CIPS_OK, delay="0.12s"),
+                    unsafe_allow_html=True)
     with c3:
         col = CIPS_CRIT if pct_fuera_global > 30 else (CIPS_WARN if pct_fuera_global > 10 else CIPS_OK)
         st.markdown(_kpi("Fuera de rango", f"{pct_fuera_global:.1f}%",
-                         "desprot. + sobreprot.", col), unsafe_allow_html=True)
+                         "desprot. + sobreprot.", col, delay="0.19s"),
+                    unsafe_allow_html=True)
     with c4:
         pct_ok = 100 - pct_fuera_global
         col = CIPS_OK if pct_ok > 70 else CIPS_WARN
         st.markdown(_kpi("En criterio", f"{pct_ok:.1f}%",
-                         "protegido −850 a −1200 mV", col), unsafe_allow_html=True)
+                         "protegido −850 a −1200 mV", col, delay="0.26s"),
+                    unsafe_allow_html=True)
     with c5:
         st.markdown(_kpi("Tramo más crítico", tramo_top[:20],
-                         f"score {score_top:.0f}", CIPS_CRIT, CIPS_CRIT), unsafe_allow_html=True)
+                         f"score {score_top:.0f}", CIPS_CRIT, CIPS_CRIT, delay="0.33s"),
+                    unsafe_allow_html=True)
 
     # ── Layout dos columnas: ranking | mapa ────────────────────────────────────
     col_rank, col_map = st.columns([4, 5], gap="medium")
@@ -1435,26 +1469,27 @@ def render_cips_comparativo(actual_list, historico_list):
         st.markdown('<div class="cips-section-title">Ranking de criticidad</div>',
                     unsafe_allow_html=True)
         if stats:
-            # Barras HTML/CSS (sin Plotly → instantáneo, sin serialización JSON)
             bars_html = ""
-            for r in stats:
-                badge = _badge(r["score"])
-                score_color = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
+            for i, r in enumerate(stats):
+                row_delay  = f"{0.15 + i * 0.08:.2f}s"
+                seg_delay  = f"{0.25 + i * 0.08:.2f}s"
+                badge      = _badge(r["score"])
+                score_col  = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
                 bars_html += f"""
-                <div class="cips-bar-row">
+                <div class="cips-bar-row" style="animation-delay:{row_delay};">
                   <div class="cips-bar-header">
-                    <span class="cips-bar-name">{r['tramo'][:32]}</span>
-                    <span style="display:flex;align-items:center;gap:6px;">
+                    <span class="cips-bar-name">{r['tramo']}</span>
+                    <span class="cips-bar-right">
                       {badge}
-                      <span class="cips-bar-score" style="color:{score_color};">{r['score']:.0f}</span>
+                      <span class="cips-bar-score" style="color:{score_col};">{r['score']:.0f}</span>
                     </span>
                   </div>
                   <div class="cips-bar-track">
-                    <div class="cips-bar-seg" style="width:{r['pct_prot']:.1f}%;background:{CIPS_OK};opacity:0.85;"></div>
-                    <div class="cips-bar-seg" style="width:{r['pct_sobre']:.1f}%;background:{CIPS_WARN};opacity:0.9;"></div>
-                    <div class="cips-bar-seg" style="width:{r['pct_desp']:.1f}%;background:{CIPS_CRIT};"></div>
+                    <div class="cips-bar-seg" style="width:{r['pct_prot']:.1f}%;background:{CIPS_OK};animation-delay:{seg_delay};"></div>
+                    <div class="cips-bar-seg" style="width:{r['pct_sobre']:.1f}%;background:{CIPS_WARN};animation-delay:{seg_delay};"></div>
+                    <div class="cips-bar-seg" style="width:{r['pct_desp']:.1f}%;background:{CIPS_CRIT};animation-delay:{seg_delay};"></div>
                   </div>
-                  <div style="font-size:0.65rem;color:#475569;margin-top:2px;">
+                  <div class="cips-bar-meta">
                     {r['pct_prot']:.0f}% prot &nbsp;·&nbsp;
                     {r['pct_sobre']:.0f}% sobre &nbsp;·&nbsp;
                     {r['pct_desp']:.0f}% desp &nbsp;·&nbsp;
@@ -1466,9 +1501,9 @@ def render_cips_comparativo(actual_list, historico_list):
               <span><span class="cips-dot" style="background:{CIPS_OK};"></span>Protegido</span>
               <span><span class="cips-dot" style="background:{CIPS_WARN};"></span>Sobreprotegido</span>
               <span><span class="cips-dot" style="background:{CIPS_CRIT};"></span>Desprotegido</span>
-            </div>
-            <div style="font-size:0.62rem;color:#475569;margin-top:0.5rem;">
-              Score = %desp × 2 + %sobre
+              <span style="margin-left:auto;font-variant-numeric:tabular-nums;">
+                Score = %desp × 2 + %sobre
+              </span>
             </div>"""
             st.markdown(bars_html, unsafe_allow_html=True)
 
@@ -1487,18 +1522,24 @@ def render_cips_comparativo(actual_list, historico_list):
             frames.append(sub[["Lat_corr","Long_corr","Estado_CP","_tramo"]])
         if frames:
             all_pts = pd.concat(frames, ignore_index=True)
+            # Etiquetas legibles para la leyenda
+            LABEL_MAP = {"PROTEGIDO":"Protegido","SOBREPROTEGIDO":"Sobreprotegido",
+                         "DESPROTEGIDO":"Desprotegido","—":"Sin dato"}
+            all_pts["Estado"] = all_pts["Estado_CP"].map(LABEL_MAP).fillna("Sin dato")
             fig_map = px.scatter_mapbox(
                 all_pts, lat="Lat_corr", lon="Long_corr",
-                color="Estado_CP",
+                color="Estado",
                 color_discrete_map={
-                    "PROTEGIDO":      CIPS_OK,
-                    "SOBREPROTEGIDO": CIPS_WARN,
-                    "DESPROTEGIDO":   CIPS_CRIT,
-                    "—":              CIPS_NONE,
+                    "Protegido":      CIPS_OK,
+                    "Sobreprotegido": CIPS_WARN,
+                    "Desprotegido":   CIPS_CRIT,
+                    "Sin dato":       CIPS_NONE,
                 },
-                hover_data={"_tramo": True, "Lat_corr": False, "Long_corr": False},
+                hover_data={"_tramo": True, "Lat_corr": False, "Long_corr": False,
+                            "Estado": False},
                 zoom=6, height=440, mapbox_style="open-street-map",
-                category_orders={"Estado_CP": ["DESPROTEGIDO","SOBREPROTEGIDO","PROTEGIDO","—"]},
+                category_orders={"Estado": ["Desprotegido","Sobreprotegido","Protegido","Sin dato"]},
+                labels={"Estado": "Estado CP", "_tramo": "Tramo"},
             )
             fig_map.update_traces(marker=dict(size=5, opacity=0.9))
             fig_map.update_layout(
@@ -1594,37 +1635,33 @@ def render_cips_comparativo(actual_list, historico_list):
         st.markdown('<div class="cips-section-title">Detalle por tramo</div>',
                     unsafe_allow_html=True)
         rows_html = """
-        <div style="overflow-x:auto;">
-        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+        <div style="overflow-x:auto;border:1px solid #E2E8F0;border-radius:12px;
+                    box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+        <table class="cips-table">
           <thead>
-            <tr style="border-bottom:2px solid #334155;color:#64748B;font-size:0.65rem;
-                       text-transform:uppercase;letter-spacing:0.08em;">
-              <th style="text-align:left;padding:6px 10px;">Tramo</th>
-              <th style="text-align:right;padding:6px 8px;">Pts</th>
-              <th style="text-align:right;padding:6px 8px;color:#16A34A;">% Prot.</th>
-              <th style="text-align:right;padding:6px 8px;color:#D97706;">% Sobre.</th>
-              <th style="text-align:right;padding:6px 8px;color:#D50032;">% Desp.</th>
-              <th style="text-align:right;padding:6px 8px;">Score</th>
-              <th style="text-align:center;padding:6px 8px;">Nivel</th>
+            <tr>
+              <th style="text-align:left;">Tramo</th>
+              <th class="num">Puntos</th>
+              <th class="num" style="color:#16A34A;">% Prot.</th>
+              <th class="num" style="color:#D97706;">% Sobre.</th>
+              <th class="num" style="color:#D50032;">% Desp.</th>
+              <th class="num">Score</th>
+              <th class="center">Nivel</th>
             </tr>
           </thead>
           <tbody>"""
-        for r in stats:
-            score_col = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
+        for i, r in enumerate(stats):
+            score_col  = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
+            row_delay  = f"{0.1 + i * 0.07:.2f}s"
             rows_html += f"""
-            <tr style="border-bottom:1px solid #F1F5F9;color:#374151;">
-              <td style="padding:7px 10px;font-weight:600;">{r['tramo']}</td>
-              <td style="text-align:right;padding:7px 8px;color:#64748B;
-                         font-variant-numeric:tabular-nums;">{r['total']:,}</td>
-              <td style="text-align:right;padding:7px 8px;color:#16A34A;
-                         font-variant-numeric:tabular-nums;">{r['pct_prot']:.1f}%</td>
-              <td style="text-align:right;padding:7px 8px;color:#D97706;
-                         font-variant-numeric:tabular-nums;">{r['pct_sobre']:.1f}%</td>
-              <td style="text-align:right;padding:7px 8px;color:#D50032;
-                         font-variant-numeric:tabular-nums;">{r['pct_desp']:.1f}%</td>
-              <td style="text-align:right;padding:7px 8px;font-weight:700;
-                         font-variant-numeric:tabular-nums;color:{score_col};">{r['score']:.0f}</td>
-              <td style="text-align:center;padding:7px 8px;">{_badge(r['score'])}</td>
+            <tr style="animation-delay:{row_delay};">
+              <td style="font-weight:600;color:#0F172A;">{r['tramo']}</td>
+              <td class="num" style="color:#64748B;">{r['total']:,}</td>
+              <td class="num" style="color:#16A34A;">{r['pct_prot']:.1f}%</td>
+              <td class="num" style="color:#D97706;">{r['pct_sobre']:.1f}%</td>
+              <td class="num" style="color:#D50032;">{r['pct_desp']:.1f}%</td>
+              <td class="num" style="font-weight:800;color:{score_col};">{r['score']:.0f}</td>
+              <td class="center">{_badge(r['score'])}</td>
             </tr>"""
         rows_html += "</tbody></table></div>"
         st.markdown(rows_html, unsafe_allow_html=True)
