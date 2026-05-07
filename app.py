@@ -869,7 +869,7 @@ def _render_pdf(pdf_url, filename="reporte.pdf"):
 
 
 def pbi_title(text):
-    st.markdown(f'<p class="pbi-title">{text}</p>', unsafe_allow_html=True)
+    st.markdown(f'<div class="cips-section-title">{text}</div>', unsafe_allow_html=True)
 
 def animated_kpi_row(items):
     """
@@ -975,6 +975,30 @@ def render_pap(d):
     </div>
     """, unsafe_allow_html=True)
 
+    # ── KPI row ────────────────────────────────────────────────────────────────
+    pct_prot  = n_prot  / total * 100 if total else 0
+    pct_sobre = n_sobre / total * 100 if total else 0
+    pct_sin   = n_sin   / total * 100 if total else 0
+    k1, k2, k3, k4, k5 = st.columns(5)
+    _pap_kpis = [
+        (k1, "Total puntos",      total,            "#0F172A",  "",        "0.05s"),
+        (k2, "Protegidos",        n_prot,           "#16A34A",  "#16A34A", "0.12s"),
+        (k3, "Sobreprotegidos",   n_sobre,          "#D97706",  "#D97706", "0.19s"),
+        (k4, "Sin protección",    n_sin,            "#D50032",  "#D50032", "0.26s"),
+        (k5, "Sin medición",      n_no,             "#94A3B8",  "",        "0.33s"),
+    ]
+    for col, label, val, accent, border, delay in _pap_kpis:
+        pct_val = (val / total * 100) if total and label != "Total puntos" and label != "Sin medición" else None
+        sub = f"{pct_val:.1f}%" if pct_val is not None else ""
+        border_style = f"border-left:4px solid {border};" if border else ""
+        with col:
+            st.markdown(
+                f'<div class="cips-kpi-card" style="{border_style}animation-delay:{delay};">'
+                f'<div class="cips-label">{label}</div>'
+                f'<div class="cips-value" style="color:{accent};">{val:,}</div>'
+                f'<div class="cips-sub">{sub}</div></div>',
+                unsafe_allow_html=True)
+
     col_tbl, col_map, col_right = st.columns([1.1, 2.0, 0.9])
 
     with col_tbl:
@@ -1051,18 +1075,18 @@ def render_pap(d):
         if "On [mV]" in pot.columns:
             fig.add_trace(go.Scatter(x=pot["Abscisa_m"], y=pot["On [mV]"],
                 mode="lines+markers", name="P On mV",
-                line=dict(color="#64B5F6", width=1.8), marker=dict(size=4, color="#64B5F6")))
+                line=dict(color="#94A3B8", width=1.8), marker=dict(size=4, color="#94A3B8")))
         if "Off [mV]" in pot.columns:
             fig.add_trace(go.Scatter(x=pot["Abscisa_m"], y=pot["Off [mV]"],
                 mode="lines+markers", name="P Off mV",
                 line=dict(color=C_SOBRE, width=1.8), marker=dict(size=5, color=C_SOBRE)))
-        fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(21,101,192,0.05)", line_width=0)
-        fig.add_hline(y=-850,  line=dict(color="#64B5F6", dash="dash", width=1.2),
-                      annotation_text="-850", annotation_position="top left",
-                      annotation_font=dict(size=9, color="#64B5F6"))
-        fig.add_hline(y=-1200, line=dict(color="#EF5350", dash="dash", width=1.2),
-                      annotation_text="-1200", annotation_position="top left",
-                      annotation_font=dict(size=9, color="#EF5350"))
+        fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(22,163,74,0.05)", line_width=0)
+        fig.add_hline(y=-850,  line=dict(color="#16A34A", dash="dash", width=1.2),
+                      annotation_text="-850 mV", annotation_position="top left",
+                      annotation_font=dict(size=9, color="#16A34A"))
+        fig.add_hline(y=-1200, line=dict(color="#D97706", dash="dash", width=1.2),
+                      annotation_text="-1200 mV", annotation_position="top left",
+                      annotation_font=dict(size=9, color="#D97706"))
         st.plotly_chart(apply_chart(fig, 280, "Abscisa (m)", "mV"), use_container_width=True)
 
     has_ir = "IR ON-OFF [mV]" in df.columns and df["IR ON-OFF [mV]"].notna().any()
@@ -1076,7 +1100,7 @@ def render_pap(d):
                 sub = df.dropna(subset=["Abscisa_m","IR ON-OFF [mV]"])
                 fig = go.Figure(go.Scatter(x=sub["Abscisa_m"], y=sub["IR ON-OFF [mV]"],
                     mode="lines+markers", name="IR ON-OFF",
-                    line=dict(color="#5C6BC0", width=1.8), marker=dict(size=4)))
+                    line=dict(color="#64748B", width=1.8), marker=dict(size=4)))
                 st.plotly_chart(apply_chart(fig, 240, "Abscisa (m)", "mV"),
                                 use_container_width=True)
         if has_ac:
@@ -1085,7 +1109,7 @@ def render_pap(d):
                 sub = df.dropna(subset=["Abscisa_m","Voltaje AC"])
                 fig = go.Figure(go.Scatter(x=sub["Abscisa_m"], y=sub["Voltaje AC"],
                     mode="lines+markers", name="Voltaje AC",
-                    line=dict(color="#7B1FA2", width=1.8), marker=dict(size=4)))
+                    line=dict(color="#64748B", width=1.8), marker=dict(size=4)))
                 st.plotly_chart(apply_chart(fig, 240, "Abscisa (m)", "V"),
                                 use_container_width=True)
 
@@ -2135,7 +2159,7 @@ def sidebar():
         # ── Navegación principal ──
         modo = st.radio(
             "Módulo",
-            ["PAP / DCVG", "CIPS"],
+            ["PAP", "CIPS"],
             label_visibility="collapsed",
             key="nav_modo"
         )
@@ -2143,7 +2167,7 @@ def sidebar():
         st.markdown('<hr style="border-color:#E2E8F0;margin:0.5rem 0;">', unsafe_allow_html=True)
 
         # ── Controles según modo ──────────────────────────────────────────────
-        if modo == "PAP / DCVG":
+        if modo == "PAP":
             st.markdown('<p style="font-size:0.8rem;font-weight:600;color:#475569;margin:0.5rem 0;">CARGAR ARCHIVOS</p>',
                         unsafe_allow_html=True)
             uploaded = st.file_uploader("Excel FastField", type=["xlsx"],
@@ -2409,7 +2433,7 @@ def main():
     result = sidebar()
     modo   = result[0]
 
-    if modo == "PAP / DCVG":
+    if modo == "PAP":
         inspecciones = result[1]
 
         if not inspecciones:
@@ -2417,10 +2441,9 @@ def main():
             <div style="margin-top:4rem;text-align:center;padding:4rem;background:white;
                         border-radius:16px;border:1px dashed #CBD5E1;
                         box-shadow:0 4px 6px rgba(0,0,0,0.02);animation:fadeUp 0.5s ease-out forwards;">
-              <h2 style="color:#0F172A;margin-bottom:0.8rem;font-weight:700;">Dashboard PAP / DCVG</h2>
+              <h2 style="color:#0F172A;margin-bottom:0.8rem;font-weight:700;">Dashboard PAP</h2>
               <p style="color:#64748B;font-size:1.1rem;line-height:1.6;max-width:500px;margin:0 auto;">
-                Sube los archivos <b>.xlsx</b> exportados desde FastField usando el panel lateral.<br>
-                La app detectará automáticamente si es <b>PAP</b> o <b>DCVG</b> y organizará los datos por tramo.
+                Sube los archivos <b>.xlsx</b> exportados desde FastField usando el panel lateral.
               </p>
             </div>
             """, unsafe_allow_html=True)
