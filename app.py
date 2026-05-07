@@ -1538,15 +1538,18 @@ def render_cips_comparativo(actual_list, historico_list):
                       annotation_font=dict(size=9, color=CIPS_WARN))
 
         fig.update_layout(
-            **CHART, height=380,
-            paper_bgcolor="rgba(30,41,59,0.5)",
+            height=380,
             plot_bgcolor="rgba(15,23,42,0.7)",
+            paper_bgcolor="rgba(30,41,59,0.5)",
+            margin=dict(t=30, b=50, l=50, r=20),
+            font=dict(size=11, family="'Inter', sans-serif", color="#94A3B8"),
             xaxis_title=dict(text="PK (m)", font=dict(size=11, color="#94A3B8")),
             yaxis_title=dict(text="Off mV", font=dict(size=11, color="#94A3B8")),
-            font=dict(color="#94A3B8"),
             legend=dict(orientation="h", y=-0.25, font_size=10,
                         bgcolor="rgba(0,0,0,0)", font_color="#94A3B8"),
             hovermode="x unified",
+            hoverlabel=dict(bgcolor="#1E293B", font_size=12,
+                            font_family="Inter", bordercolor="#334155"),
         )
         fig.update_xaxes(showgrid=True, gridcolor="#273549", zeroline=False,
                          tickfont=dict(color="#64748B"))
