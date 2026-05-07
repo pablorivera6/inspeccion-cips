@@ -1150,71 +1150,53 @@ def render_cips_comparativo(actual_list, historico_list):
     score_top         = stats[0]["score"] if stats else 0
 
     # ── Canvas oscuro ──────────────────────────────────────────────────────────
-    # ── Cabecera ───────────────────────────────────────────────────────────────
+    # ── Situación global: bloque narrativo + barra compuesta ──────────────────
+    pct_ok     = 100 - pct_fuera_global
+    crit_color = CIPS_CRIT if n_criticos > 0 else CIPS_OK
+    range_color= CIPS_CRIT if pct_fuera_global > 30 else (CIPS_WARN if pct_fuera_global > 10 else CIPS_OK)
+
+    # Barra compuesta (protegido | sobreprotegido | desprotegido) global
+    pct_sobre_global = (sum(r["n_sobre"] for r in stats) / n_total_pts * 100) if n_total_pts else 0
+    pct_desp_global  = (sum(r["n_desp"]  for r in stats) / n_total_pts * 100) if n_total_pts else 0
+    pct_prot_global  = 100 - pct_sobre_global - pct_desp_global
+
+    statement = (f'<span style="color:{crit_color};font-weight:700;">'
+                 f'{n_criticos} tramo{"s" if n_criticos!=1 else ""} fuera de criterio</span>'
+                 if n_criticos > 0
+                 else '<span style="color:#16A34A;font-weight:700;">todos los tramos en criterio</span>')
+
     st.markdown(f"""
     <div style="background:white;border:1px solid #E2E8F0;border-radius:10px;
-                padding:1rem 1.4rem;
-                display:flex;align-items:center;justify-content:space-between;
-                flex-wrap:wrap;gap:0.8rem;margin-bottom:1.2rem;">
-      <div>
-        <div style="font-size:var(--text-xs);color:#94A3B8;font-weight:600;
-                    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:3px;">
-          PCC Integrity · CIPS
+                padding:1.2rem 1.6rem;margin-bottom:1.2rem;">
+      <div style="display:flex;align-items:baseline;justify-content:space-between;
+                  flex-wrap:wrap;gap:0.5rem;margin-bottom:0.9rem;">
+        <div>
+          <span style="font-size:var(--text-xs);color:#94A3B8;font-weight:600;
+                       text-transform:uppercase;letter-spacing:0.12em;">
+            PCC Integrity · CIPS &nbsp;·&nbsp; {len(stats)} tramos &nbsp;·&nbsp; {n_total_pts:,} pts
+          </span>
+          <div style="font-size:var(--text-md);font-weight:600;color:#0F172A;margin-top:3px;">
+            {statement},
+            <span style="color:{range_color};font-weight:700;">{pct_fuera_global:.1f}%</span>
+            del total fuera de rango
+          </div>
         </div>
-        <div style="font-size:1rem;font-weight:700;color:#0F172A;">
-          Inspecciones — Vista Comparativa
+        <div style="display:flex;gap:1rem;font-size:var(--text-xs);color:#94A3B8;flex-shrink:0;">
+          <span><span style="color:#16A34A;font-weight:700;">{pct_prot_global:.0f}%</span> prot.</span>
+          <span><span style="color:#D97706;font-weight:700;">{pct_sobre_global:.0f}%</span> sobre.</span>
+          <span><span style="color:#DC2626;font-weight:700;">{pct_desp_global:.0f}%</span> desp.</span>
         </div>
       </div>
-      <div style="display:flex;gap:0.6rem;">
-        <div style="background:#FFF5F6;border:1px solid #FECDD3;border-radius:8px;
-                    padding:0.5rem 0.9rem;text-align:center;">
-          <div style="font-size:var(--text-md);font-weight:800;color:#D50032;">{len(actual_list)}</div>
-          <div style="font-size:var(--text-xs);color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
-          <div style="font-size:var(--text-xs);color:#D50032;font-weight:600;">{n_act:,} pts</div>
-        </div>
-        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;
-                    padding:0.5rem 0.9rem;text-align:center;">
-          <div style="font-size:var(--text-md);font-weight:800;color:#475569;">{len(historico_list)}</div>
-          <div style="font-size:var(--text-xs);color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;">Históricos</div>
-          <div style="font-size:var(--text-xs);color:#64748B;">{n_his:,} pts</div>
-        </div>
+      <div style="height:8px;border-radius:4px;background:#F1F5F9;overflow:hidden;display:flex;">
+        <div style="width:{pct_prot_global:.1f}%;background:{CIPS_OK};
+                    animation:barGrow 0.6s ease-out both;"></div>
+        <div style="width:{pct_sobre_global:.1f}%;background:{CIPS_WARN};
+                    animation:barGrow 0.6s ease-out 0.1s both;"></div>
+        <div style="width:{pct_desp_global:.1f}%;background:{CIPS_CRIT};
+                    animation:barGrow 0.6s ease-out 0.2s both;"></div>
       </div>
     </div>
     """, unsafe_allow_html=True)
-
-    # ── KPI row (5 cards) — delays inline para que funcionen en columnas Streamlit
-    c1, c2, c3, c4, c5 = st.columns(5)
-
-    def _kpi(label, val, sub="", accent="#0F172A", border_color="", delay="0s"):
-        # No border-left: estado semántico se comunica con el color del valor
-        return (f'<div class="cips-kpi-card" style="animation-delay:{delay};">'
-                f'<div class="cips-label">{label}</div>'
-                f'<div class="cips-value" style="color:{accent};">{val}</div>'
-                f'<div class="cips-sub">{sub}</div></div>')
-
-    with c1:
-        st.markdown(_kpi("Tramos", len(stats), f"{n_total_pts:,} pts totales",
-                         delay="0.05s"), unsafe_allow_html=True)
-    with c2:
-        col = CIPS_CRIT if n_criticos > 0 else CIPS_OK
-        st.markdown(_kpi("Tramos críticos", n_criticos, "score ≥ 50", col,
-                         CIPS_CRIT if n_criticos else CIPS_OK, delay="0.12s"),
-                    unsafe_allow_html=True)
-    with c3:
-        col = CIPS_CRIT if pct_fuera_global > 30 else (CIPS_WARN if pct_fuera_global > 10 else CIPS_OK)
-        st.markdown(_kpi("Fuera de rango", f"{pct_fuera_global:.1f}%",
-                         "desprot. + sobreprot.", col, delay="0.19s"),
-                    unsafe_allow_html=True)
-    with c4:
-        pct_ok = 100 - pct_fuera_global
-        col = CIPS_OK if pct_ok > 70 else CIPS_WARN
-        st.markdown(_kpi("En criterio", f"{pct_ok:.1f}%",
-                         "protegido −850 a −1200 mV", col, delay="0.26s"),
-                    unsafe_allow_html=True)
-    with c5:
-        st.markdown(_kpi("Tramo más crítico", tramo_top[:20],
-                         f"score {score_top:.0f}", CIPS_CRIT, CIPS_CRIT, delay="0.33s"),
-                    unsafe_allow_html=True)
 
     # ── Layout dos columnas: ranking | mapa ────────────────────────────────────
     col_rank, col_map = st.columns([4, 5], gap="medium")
