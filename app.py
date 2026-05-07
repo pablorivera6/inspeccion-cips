@@ -43,6 +43,20 @@ ESTADO_COLORS = {
     "Sin medición":   "#BDBDBD",
 }
 
+# ── Tokens semánticos CIPS ─────────────────────────────────────────────────────
+CIPS_OK    = "#16A34A"   # Protegido
+CIPS_WARN  = "#D97706"   # Sobreprotegido (precaución)
+CIPS_CRIT  = "#D50032"   # Desprotegido (crítico)
+CIPS_NONE  = "#475569"   # Sin dato
+
+# Superficies modo oscuro CIPS
+CIPS_BG    = "#0F172A"
+CIPS_SURF1 = "#1E293B"
+CIPS_SURF2 = "#273549"
+CIPS_BORD  = "#334155"
+CIPS_TXT1  = "#F1F5F9"
+CIPS_TXT2  = "#94A3B8"
+
 # ── CSS unificado ──────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
@@ -325,6 +339,73 @@ st.markdown("""
 
   #MainMenu, footer { visibility: hidden; }
   [data-testid="stToolbar"] { visibility: hidden; }
+
+  /* ── CIPS: tema oscuro ─────────────────────────────────────────────────── */
+  .cips-canvas {
+    background: #0F172A; border-radius: 16px;
+    padding: 1.6rem 1.8rem; margin-bottom: 1rem;
+  }
+  .cips-kpi-card {
+    background: #1E293B; border: 1px solid #334155; border-radius: 10px;
+    padding: 1rem 1.2rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .cips-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
+  }
+  .cips-label {
+    font-size: 0.62rem; font-weight: 700; color: #64748B;
+    text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 4px;
+  }
+  .cips-value {
+    font-size: 1.8rem; font-weight: 800; color: #F1F5F9;
+    font-variant-numeric: tabular-nums; line-height: 1;
+  }
+  .cips-sub { font-size: 0.72rem; color: #64748B; margin-top: 3px; }
+  .cips-section-title {
+    font-size: 0.7rem; font-weight: 700; color: #64748B;
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin: 1.4rem 0 0.7rem; padding-left: 9px;
+    border-left: 3px solid #D50032;
+  }
+
+  /* Ranking bars */
+  .cips-bar-row {
+    display: flex; flex-direction: column; gap: 2px;
+    margin-bottom: 0.8rem;
+  }
+  .cips-bar-header {
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-bottom: 4px;
+  }
+  .cips-bar-name {
+    font-size: 0.82rem; font-weight: 600; color: #CBD5E1;
+  }
+  .cips-bar-score {
+    font-size: 0.72rem; font-weight: 700; font-variant-numeric: tabular-nums;
+  }
+  .cips-bar-track {
+    height: 18px; border-radius: 4px; background: #273549;
+    overflow: hidden; display: flex;
+  }
+  .cips-bar-seg {
+    height: 100%; transition: width 0.6s ease;
+  }
+  .cips-bar-legend {
+    display: flex; gap: 1rem; margin-top: 0.5rem;
+    font-size: 0.65rem; color: #64748B;
+  }
+  .cips-bar-legend span { display: flex; align-items: center; gap: 4px; }
+  .cips-dot {
+    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+  }
+
+  /* Badges nivel */
+  .badge-critico  { background:#450a0a; color:#fca5a5; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
+  .badge-moderado { background:#451a03; color:#fde68a; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
+  .badge-bajo     { background:#052e16; color:#86efac; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:700; letter-spacing:0.05em; }
+  .badge-sin      { background:#1e293b; color:#64748b; padding:2px 9px; border-radius:20px; font-size:0.7rem; font-weight:600; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -1229,196 +1310,205 @@ def _criticidad_stats(todos):
     return sorted(rows, key=lambda r: r["score"], reverse=True)
 
 
-def render_cips_comparativo(actual_list, historico_list):
-    todos = actual_list + historico_list
-    n_act = sum(len(d["df"]) for d in actual_list)
-    n_his = sum(len(d["df"]) for d in historico_list)
+def _badge(score):
+    if score >= 50: return '<span class="badge-critico">CRÍTICO</span>'
+    if score >= 20: return '<span class="badge-moderado">MODERADO</span>'
+    return '<span class="badge-bajo">BAJO</span>'
 
-    # ── Header ─────────────────────────────────────────────────────────────────
+
+def render_cips_comparativo(actual_list, historico_list):
+    todos  = actual_list + historico_list
+    n_act  = sum(len(d["df"]) for d in actual_list)
+    n_his  = sum(len(d["df"]) for d in historico_list)
+    stats  = _criticidad_stats(todos)
+
+    n_total_pts       = sum(r["total"] for r in stats) if stats else 0
+    n_criticos        = sum(1 for r in stats if r["score"] >= 50)
+    pct_fuera_global  = (sum(r["n_desp"] + r["n_sobre"] for r in stats)
+                         / n_total_pts * 100) if n_total_pts else 0
+    tramo_top         = stats[0]["tramo"]  if stats else "—"
+    score_top         = stats[0]["score"] if stats else 0
+
+    # ── Canvas oscuro ──────────────────────────────────────────────────────────
+    st.markdown('<div class="cips-canvas">', unsafe_allow_html=True)
+
+    # ── Cabecera ───────────────────────────────────────────────────────────────
     st.markdown(f"""
-    <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;
-                padding:1.2rem 1.8rem;margin-bottom:1rem;
-                box-shadow:0 4px 16px -4px rgba(0,0,0,0.06);
-                display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.8rem;">
+    <div style="display:flex;align-items:center;justify-content:space-between;
+                flex-wrap:wrap;gap:0.6rem;margin-bottom:1.2rem;">
       <div>
-        <div style="font-size:0.7rem;color:#D50032;font-weight:700;
-                    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px;">
-          Inspecciones CIPS — Vista Comparativa
+        <div style="font-size:0.62rem;color:#D50032;font-weight:700;
+                    text-transform:uppercase;letter-spacing:0.14em;">
+          PCC Integrity · CIPS
         </div>
-        <div style="font-size:1.2rem;font-weight:800;color:#0F172A;">
-          {len(todos)} tramo{'s' if len(todos)!=1 else ''} analizados
+        <div style="font-size:1.4rem;font-weight:800;color:#F1F5F9;margin-top:2px;">
+          Inspecciones — Vista Comparativa
         </div>
       </div>
-      <div style="display:flex;gap:1rem;text-align:center;flex-wrap:wrap;">
-        <div style="background:#FFF5F6;border:1px solid #FECDD3;border-radius:10px;padding:0.6rem 1rem;">
-          <div style="font-size:1.3rem;font-weight:800;color:#D50032;">{len(actual_list)}</div>
-          <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
-          <div style="font-size:0.72rem;color:#D50032;font-weight:600;">{n_act:,} pts</div>
+      <div style="display:flex;gap:0.6rem;">
+        <div style="background:#1E293B;border:1px solid #334155;border-radius:8px;
+                    padding:0.5rem 0.9rem;text-align:center;">
+          <div style="font-size:1.1rem;font-weight:800;color:#D50032;">{len(actual_list)}</div>
+          <div style="font-size:0.6rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
+          <div style="font-size:0.65rem;color:#94A3B8;">{n_act:,} pts</div>
         </div>
-        <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:0.6rem 1rem;">
-          <div style="font-size:1.3rem;font-weight:800;color:#6B7280;">{len(historico_list)}</div>
-          <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Históricos</div>
-          <div style="font-size:0.72rem;color:#6B7280;font-weight:600;">{n_his:,} pts</div>
+        <div style="background:#1E293B;border:1px solid #334155;border-radius:8px;
+                    padding:0.5rem 0.9rem;text-align:center;">
+          <div style="font-size:1.1rem;font-weight:800;color:#94A3B8;">{len(historico_list)}</div>
+          <div style="font-size:0.6rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;">Históricos</div>
+          <div style="font-size:0.65rem;color:#94A3B8;">{n_his:,} pts</div>
         </div>
       </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # ── Análisis de criticidad ─────────────────────────────────────────────────
-    stats = _criticidad_stats(todos)
-    if stats:
-        n_total_pts = sum(r["total"] for r in stats)
-        pct_critico_global = sum(r["n_desp"] + r["n_sobre"] for r in stats) / n_total_pts * 100 if n_total_pts else 0
-        tramo_mas_critico  = stats[0]["tramo"] if stats else "—"
-        score_max          = stats[0]["score"] if stats else 0
+    # ── KPI row (5 cards) ──────────────────────────────────────────────────────
+    c1, c2, c3, c4, c5 = st.columns(5)
+    _kpi = lambda label, val, sub="", accent="#F1F5F9", left_border="": (
+        f'<div class="cips-kpi-card" style="border-left:4px solid {left_border};">'
+        f'<div class="cips-label">{label}</div>'
+        f'<div class="cips-value" style="color:{accent};">{val}</div>'
+        f'<div class="cips-sub">{sub}</div></div>'
+        if left_border else
+        f'<div class="cips-kpi-card">'
+        f'<div class="cips-label">{label}</div>'
+        f'<div class="cips-value" style="color:{accent};">{val}</div>'
+        f'<div class="cips-sub">{sub}</div></div>'
+    )
+    with c1:
+        st.markdown(_kpi("Tramos", len(stats), f"{n_total_pts:,} pts totales"), unsafe_allow_html=True)
+    with c2:
+        col = CIPS_CRIT if n_criticos > 0 else CIPS_OK
+        st.markdown(_kpi("Tramos críticos", n_criticos,
+                         "score ≥ 50", col, CIPS_CRIT if n_criticos else CIPS_OK),
+                    unsafe_allow_html=True)
+    with c3:
+        col = CIPS_CRIT if pct_fuera_global > 30 else (CIPS_WARN if pct_fuera_global > 10 else CIPS_OK)
+        st.markdown(_kpi("Fuera de rango", f"{pct_fuera_global:.1f}%",
+                         "desprot. + sobreprot.", col), unsafe_allow_html=True)
+    with c4:
+        pct_ok = 100 - pct_fuera_global
+        col = CIPS_OK if pct_ok > 70 else CIPS_WARN
+        st.markdown(_kpi("En criterio", f"{pct_ok:.1f}%", "protegido −850 a −1200 mV", col),
+                    unsafe_allow_html=True)
+    with c5:
+        st.markdown(_kpi("Tramo más crítico", tramo_top[:22],
+                         f"score {score_top:.0f}", CIPS_CRIT, CIPS_CRIT),
+                    unsafe_allow_html=True)
 
-        # KPIs globales
-        kpi_css = ("background:white;border:1px solid #E2E8F0;border-radius:10px;"
-                   "padding:0.9rem 1.1rem;box-shadow:0 2px 8px -2px rgba(0,0,0,0.05);")
-        c1, c2, c3, c4 = st.columns(4)
-        with c1:
-            st.markdown(f'<div style="{kpi_css}">'
-                        f'<div style="font-size:0.65rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Tramos</div>'
-                        f'<div style="font-size:1.6rem;font-weight:800;color:#0F172A;">{len(stats)}</div></div>',
-                        unsafe_allow_html=True)
-        with c2:
-            st.markdown(f'<div style="{kpi_css}">'
-                        f'<div style="font-size:0.65rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Puntos totales</div>'
-                        f'<div style="font-size:1.6rem;font-weight:800;color:#0F172A;">{n_total_pts:,}</div></div>',
-                        unsafe_allow_html=True)
-        with c3:
-            color_kpi = "#D50032" if pct_critico_global > 20 else "#374151"
-            st.markdown(f'<div style="{kpi_css}">'
-                        f'<div style="font-size:0.65rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Fuera de rango global</div>'
-                        f'<div style="font-size:1.6rem;font-weight:800;color:{color_kpi};">{pct_critico_global:.1f}%</div></div>',
-                        unsafe_allow_html=True)
-        with c4:
-            st.markdown(f'<div style="{kpi_css};border-left:4px solid #D50032;">'
-                        f'<div style="font-size:0.65rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.1em;">Tramo más crítico</div>'
-                        f'<div style="font-size:0.95rem;font-weight:800;color:#D50032;line-height:1.2;">'
-                        f'{tramo_mas_critico[:30]}</div>'
-                        f'<div style="font-size:0.72rem;color:#6B7280;">score {score_max:.0f}</div></div>',
-                        unsafe_allow_html=True)
+    # ── Layout dos columnas: ranking | mapa ────────────────────────────────────
+    col_rank, col_map = st.columns([4, 5], gap="medium")
 
-        st.markdown("<div style='margin:0.6rem 0;'></div>", unsafe_allow_html=True)
+    with col_rank:
+        st.markdown('<div class="cips-section-title">Ranking de criticidad</div>',
+                    unsafe_allow_html=True)
+        if stats:
+            # Barras HTML/CSS (sin Plotly → instantáneo, sin serialización JSON)
+            bars_html = ""
+            for r in stats:
+                badge = _badge(r["score"])
+                score_color = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
+                bars_html += f"""
+                <div class="cips-bar-row">
+                  <div class="cips-bar-header">
+                    <span class="cips-bar-name">{r['tramo'][:32]}</span>
+                    <span style="display:flex;align-items:center;gap:6px;">
+                      {badge}
+                      <span class="cips-bar-score" style="color:{score_color};">{r['score']:.0f}</span>
+                    </span>
+                  </div>
+                  <div class="cips-bar-track">
+                    <div class="cips-bar-seg" style="width:{r['pct_prot']:.1f}%;background:{CIPS_OK};opacity:0.85;"></div>
+                    <div class="cips-bar-seg" style="width:{r['pct_sobre']:.1f}%;background:{CIPS_WARN};opacity:0.9;"></div>
+                    <div class="cips-bar-seg" style="width:{r['pct_desp']:.1f}%;background:{CIPS_CRIT};"></div>
+                  </div>
+                  <div style="font-size:0.65rem;color:#475569;margin-top:2px;">
+                    {r['pct_prot']:.0f}% prot &nbsp;·&nbsp;
+                    {r['pct_sobre']:.0f}% sobre &nbsp;·&nbsp;
+                    {r['pct_desp']:.0f}% desp &nbsp;·&nbsp;
+                    {r['total']:,} pts
+                  </div>
+                </div>"""
+            bars_html += f"""
+            <div class="cips-bar-legend">
+              <span><span class="cips-dot" style="background:{CIPS_OK};"></span>Protegido</span>
+              <span><span class="cips-dot" style="background:{CIPS_WARN};"></span>Sobreprotegido</span>
+              <span><span class="cips-dot" style="background:{CIPS_CRIT};"></span>Desprotegido</span>
+            </div>
+            <div style="font-size:0.62rem;color:#475569;margin-top:0.5rem;">
+              Score = %desp × 2 + %sobre
+            </div>"""
+            st.markdown(bars_html, unsafe_allow_html=True)
 
-        # Gráfica horizontal de criticidad por tramo
-        divider()
-        pbi_title("Ranking de criticidad por tramo")
-
-        bar_rows = []
-        for r in stats:
-            bar_rows.append({"Tramo": r["tramo"], "Estado": "PROTEGIDO",      "Pct": r["pct_prot"]})
-            bar_rows.append({"Tramo": r["tramo"], "Estado": "DESPROTEGIDO",   "Pct": r["pct_desp"]})
-            bar_rows.append({"Tramo": r["tramo"], "Estado": "SOBREPROTEGIDO", "Pct": r["pct_sobre"]})
-        bar_df = pd.DataFrame(bar_rows)
-        # Orden: más crítico arriba
-        order = [r["tramo"] for r in reversed(stats)]
-
-        fig_bar = px.bar(
-            bar_df, x="Pct", y="Tramo", color="Estado", orientation="h",
-            color_discrete_map={"PROTEGIDO": "#374151", "DESPROTEGIDO": "#D50032", "SOBREPROTEGIDO": "#7F1D1D"},
-            category_orders={"Tramo": order},
-            barmode="stack", height=max(260, len(stats) * 52),
-            custom_data=["Estado"],
-        )
-        fig_bar.update_traces(
-            hovertemplate="%{customdata[0]}: %{x:.1f}%<extra></extra>"
-        )
-        fig_bar.update_layout(
-            **CHART,
-            height=max(260, len(stats) * 52),
-            xaxis=dict(title="% puntos", ticksuffix="%", showgrid=True,
-                       gridcolor="#F1F5F9", range=[0, 100]),
-            yaxis=dict(title="", showgrid=False),
-            legend=dict(orientation="h", y=-0.18, font_size=11),
-            bargap=0.25,
-        )
-        # Anotación con score en cada barra
-        for r in stats:
-            fig_bar.add_annotation(
-                x=101, y=r["tramo"],
-                text=f'<b style="color:#D50032">{r["score"]:.0f}</b>',
-                showarrow=False, xanchor="left", font=dict(size=10, color="#D50032"),
-                xref="x", yref="y",
+    with col_map:
+        st.markdown('<div class="cips-section-title">Distribución geográfica</div>',
+                    unsafe_allow_html=True)
+        frames = []
+        for d in todos:
+            if "Lat_corr" not in d["df"].columns: continue
+            sub = d["df"].dropna(subset=["Lat_corr","Long_corr"]).copy()
+            if sub.empty: continue
+            if "Estado_CP" not in sub.columns: sub["Estado_CP"] = "—"
+            sub["_tramo"] = d["tramo"]
+            if len(sub) > 3000:
+                sub = sub.iloc[::max(1, len(sub)//3000)]
+            frames.append(sub[["Lat_corr","Long_corr","Estado_CP","_tramo"]])
+        if frames:
+            all_pts = pd.concat(frames, ignore_index=True)
+            fig_map = px.scatter_mapbox(
+                all_pts, lat="Lat_corr", lon="Long_corr",
+                color="Estado_CP",
+                color_discrete_map={
+                    "PROTEGIDO":      CIPS_OK,
+                    "SOBREPROTEGIDO": CIPS_WARN,
+                    "DESPROTEGIDO":   CIPS_CRIT,
+                    "—":              CIPS_NONE,
+                },
+                hover_data={"_tramo": True, "Lat_corr": False, "Long_corr": False},
+                zoom=6, height=440, mapbox_style="open-street-map",
+                category_orders={"Estado_CP": ["DESPROTEGIDO","SOBREPROTEGIDO","PROTEGIDO","—"]},
             )
-        st.plotly_chart(fig_bar, use_container_width=True)
+            fig_map.update_traces(marker=dict(size=5, opacity=0.9))
+            fig_map.update_layout(
+                margin=dict(t=0, b=0, l=0, r=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                legend=dict(x=0.01, y=0.99,
+                            bgcolor="rgba(15,23,42,0.88)", font_color="#F1F5F9",
+                            bordercolor="#334155", borderwidth=1, font_size=11),
+            )
+            st.plotly_chart(fig_map, use_container_width=True)
+        else:
+            st.markdown('<p style="color:#475569;font-size:0.85rem;">Sin coordenadas GPS disponibles.</p>',
+                        unsafe_allow_html=True)
 
-        # Leyenda del score
-        st.markdown(
-            '<p style="font-size:0.72rem;color:#94A3B8;margin:-0.5rem 0 0.5rem;">'
-            'Score de criticidad = % desprotegido × 2 + % sobreprotegido · '
-            '<span style="color:#D50032;font-weight:600;">≥50 crítico</span> · '
-            '<span style="color:#374151;font-weight:600;">&lt;20 bajo riesgo</span></p>',
-            unsafe_allow_html=True,
-        )
-
-    # ── Mapa coloreado por Estado_CP ────────────────────────────────────────────
-    frames = []
-    for d in todos:
-        lat = "Lat_corr" if "Lat_corr" in d["df"].columns else None
-        lon = "Long_corr" if "Long_corr" in d["df"].columns else None
-        if not lat: continue
-        cols_need = [lat, lon]
-        if "Estado_CP" in d["df"].columns: cols_need.append("Estado_CP")
-        sub = d["df"].dropna(subset=[lat, lon]).copy()
-        if sub.empty: continue
-        if "Estado_CP" not in sub.columns:
-            sub["Estado_CP"] = "—"
-        sub["_tramo"]    = d["tramo"]
-        sub["_categoria"]= d["categoria"]
-        # Submuestreo para rendimiento
-        if len(sub) > 3000:
-            sub = sub.iloc[::max(1, len(sub)//3000)]
-        frames.append(sub[[lat, lon, "Estado_CP", "_tramo", "_categoria"]])
-
-    if frames:
-        divider()
-        pbi_title("Distribución geográfica — estado de protección")
-        all_pts = pd.concat(frames, ignore_index=True)
-        COLOR_MAP = {
-            "PROTEGIDO":      "#6B7280",
-            "DESPROTEGIDO":   "#D50032",
-            "SOBREPROTEGIDO": "#7F1D1D",
-            "—":              "#CBD5E1",
-        }
-        fig_map = px.scatter_mapbox(
-            all_pts, lat="Lat_corr", lon="Long_corr",
-            color="Estado_CP",
-            color_discrete_map=COLOR_MAP,
-            hover_data={"_tramo": True, "_categoria": True,
-                        "Lat_corr": False, "Long_corr": False},
-            zoom=7, height=500, mapbox_style="open-street-map",
-            category_orders={"Estado_CP": ["DESPROTEGIDO","SOBREPROTEGIDO","PROTEGIDO","—"]},
-        )
-        fig_map.update_traces(marker=dict(size=5, opacity=0.9))
-        fig_map.update_layout(
-            margin=dict(t=0, b=0, l=0, r=0),
-            legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.92)",
-                        borderwidth=1, font_size=11),
-        )
-        st.plotly_chart(fig_map, use_container_width=True)
-
-    # ── Gráfica Off mV por PK ──────────────────────────────────────────────────
-    pk_key = lambda d: next((c for c in ["PK_geom_m","PK_real_m"] if c in d["df"].columns), None)
-    tiene_grafica = any(pk_key(d) and "Off_mV_limpio" in d["df"].columns for d in todos)
-    if tiene_grafica:
-        divider()
-        pbi_title("Perfil Off mV por PK — todos los tramos")
+    # ── Perfil Off mV ──────────────────────────────────────────────────────────
+    pk_key      = lambda d: next((c for c in ["PK_geom_m","PK_real_m"] if c in d["df"].columns), None)
+    tiene_chart = any(pk_key(d) and "Off_mV_limpio" in d["df"].columns for d in todos)
+    if tiene_chart:
+        st.markdown('<div class="cips-section-title">Perfil Off mV por PK — todos los tramos</div>',
+                    unsafe_allow_html=True)
         fig = go.Figure()
 
-        COLORES_H = ["#9CA3AF","#6B7280","#4B5563","#374151","#D1D5DB"]
-        COLORES_A = ["#D50032","#991B1B","#EF4444"]
+        # Paletas diferenciadas por estilo de línea + color
+        DASH_STYLES = ["dot", "dash", "dashdot", "longdash", "longdashdot"]
+        GRAY_PALETTE = ["#94A3B8","#64748B","#475569","#CBD5E1","#334155"]
+        RED_PALETTE  = ["#D50032","#F87171","#9B0022","#EF4444","#B91C1C"]
+
         for i, d in enumerate(historico_list):
             pk = pk_key(d)
             if not pk or "Off_mV_limpio" not in d["df"].columns: continue
             sub = d["df"].dropna(subset=[pk]).sort_values(pk)
             if len(sub) > 2000: sub = sub.iloc[::max(1, len(sub)//2000)]
+            r   = next((s for s in stats if s["tramo"] == d["tramo"]), None)
+            col = (CIPS_CRIT if r and r["score"] >= 50
+                   else CIPS_WARN if r and r["score"] >= 20
+                   else GRAY_PALETTE[i % len(GRAY_PALETTE)])
             fig.add_trace(go.Scatter(
                 x=sub[pk], y=sub["Off_mV_limpio"],
-                mode="lines", name=f"[H] {d['tramo'][:22]}",
-                line=dict(color=COLORES_H[i % len(COLORES_H)], width=1.2, dash="dot"),
-                opacity=0.75))
+                mode="lines", name=d["tramo"][:24],
+                line=dict(color=col, width=1.6, dash=DASH_STYLES[i % len(DASH_STYLES)]),
+                opacity=0.85))
 
         for i, d in enumerate(actual_list):
             pk = pk_key(d)
@@ -1427,61 +1517,84 @@ def render_cips_comparativo(actual_list, historico_list):
             if len(sub) > 2000: sub = sub.iloc[::max(1, len(sub)//2000)]
             fig.add_trace(go.Scatter(
                 x=sub[pk], y=sub["Off_mV_limpio"],
-                mode="lines", name=f"[A] {d['tramo'][:22]}",
-                line=dict(color=COLORES_A[i % len(COLORES_A)], width=2.0)))
+                mode="lines", name=f"[ACT] {d['tramo'][:20]}",
+                line=dict(color=RED_PALETTE[i % len(RED_PALETTE)], width=2.2)))
 
-        fig.add_hline(y=-850,  line=dict(color="#6B7280", dash="dash", width=1),
-                      annotation_text="-850 mV", annotation_position="top right",
-                      annotation_font=dict(size=9, color="#6B7280"))
-        fig.add_hline(y=-1200, line=dict(color="#D50032", dash="dash", width=1),
-                      annotation_text="-1.200 mV", annotation_position="bottom right",
-                      annotation_font=dict(size=9, color="#D50032"))
-        fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(55,65,81,0.04)", line_width=0)
+        # Zonas de criterio
+        fig.add_hrect(y0=-1200, y1=-850,
+                      fillcolor="rgba(22,163,74,0.06)", line_width=0,
+                      annotation_text="Zona protegida",
+                      annotation_position="top left",
+                      annotation_font=dict(size=9, color="#16A34A"))
+        fig.add_hline(y=-850,
+                      line=dict(color="#16A34A", dash="dash", width=1.2),
+                      annotation_text="-850 mV",
+                      annotation_position="top right",
+                      annotation_font=dict(size=9, color="#16A34A"))
+        fig.add_hline(y=-1200,
+                      line=dict(color=CIPS_WARN, dash="dash", width=1.2),
+                      annotation_text="-1 200 mV",
+                      annotation_position="bottom right",
+                      annotation_font=dict(size=9, color=CIPS_WARN))
+
         fig.update_layout(
-            **CHART, height=360,
-            xaxis_title=dict(text="PK (m)", font=dict(size=11, color="#64748B")),
-            yaxis_title=dict(text="Off mV",  font=dict(size=11, color="#64748B")),
-            legend=dict(orientation="h", y=-0.28, font_size=10),
+            **CHART, height=380,
+            paper_bgcolor="rgba(30,41,59,0.5)",
+            plot_bgcolor="rgba(15,23,42,0.7)",
+            xaxis_title=dict(text="PK (m)", font=dict(size=11, color="#94A3B8")),
+            yaxis_title=dict(text="Off mV", font=dict(size=11, color="#94A3B8")),
+            font=dict(color="#94A3B8"),
+            legend=dict(orientation="h", y=-0.25, font_size=10,
+                        bgcolor="rgba(0,0,0,0)", font_color="#94A3B8"),
             hovermode="x unified",
         )
-        fig.update_xaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
-        fig.update_yaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
+        fig.update_xaxes(showgrid=True, gridcolor="#273549", zeroline=False,
+                         tickfont=dict(color="#64748B"))
+        fig.update_yaxes(showgrid=True, gridcolor="#273549", zeroline=False,
+                         tickfont=dict(color="#64748B"))
         st.plotly_chart(fig, use_container_width=True)
 
-    # ── Tabla detallada ─────────────────────────────────────────────────────────
+    # ── Tabla detallada ────────────────────────────────────────────────────────
     if stats:
-        divider()
-        pbi_title("Detalle por tramo")
-        tbl_rows = []
+        st.markdown('<div class="cips-section-title">Detalle por tramo</div>',
+                    unsafe_allow_html=True)
+        rows_html = """
+        <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;font-size:0.82rem;">
+          <thead>
+            <tr style="border-bottom:2px solid #334155;color:#64748B;font-size:0.65rem;
+                       text-transform:uppercase;letter-spacing:0.08em;">
+              <th style="text-align:left;padding:6px 10px;">Tramo</th>
+              <th style="text-align:right;padding:6px 8px;">Pts</th>
+              <th style="text-align:right;padding:6px 8px;color:#16A34A;">% Prot.</th>
+              <th style="text-align:right;padding:6px 8px;color:#D97706;">% Sobre.</th>
+              <th style="text-align:right;padding:6px 8px;color:#D50032;">% Desp.</th>
+              <th style="text-align:right;padding:6px 8px;">Score</th>
+              <th style="text-align:center;padding:6px 8px;">Nivel</th>
+            </tr>
+          </thead>
+          <tbody>"""
         for r in stats:
-            nivel = ("🔴 CRÍTICO" if r["score"] >= 50
-                     else "🟡 MODERADO" if r["score"] >= 20
-                     else "🟢 BAJO")
-            tbl_rows.append({
-                "Tramo":         r["tramo"],
-                "Cat.":          r["categoria"],
-                "Fecha":         r["fecha"],
-                "Pts":           r["total"],
-                "% Prot.":       f"{r['pct_prot']:.1f}%",
-                "% Desprot.":    f"{r['pct_desp']:.1f}%",
-                "% Sobreprot.":  f"{r['pct_sobre']:.1f}%",
-                "Score":         r["score"],
-                "Nivel":         nivel,
-            })
-        tbl = pd.DataFrame(tbl_rows)
-        def _style_score(val):
-            if isinstance(val, float):
-                if val >= 50: return "color:#D50032;font-weight:700;"
-                if val >= 20: return "color:#B45309;font-weight:600;"
-            return "color:#374151;"
-        try:
-            st.dataframe(
-                tbl.style.map(_style_score, subset=["Score"]),
-                use_container_width=True, hide_index=True,
-                height=min(60 + len(tbl_rows)*38, 400),
-            )
-        except Exception:
-            st.dataframe(tbl, use_container_width=True, hide_index=True)
+            score_col = CIPS_CRIT if r["score"] >= 50 else (CIPS_WARN if r["score"] >= 20 else CIPS_OK)
+            rows_html += f"""
+            <tr style="border-bottom:1px solid #273549;color:#CBD5E1;">
+              <td style="padding:7px 10px;font-weight:600;">{r['tramo']}</td>
+              <td style="text-align:right;padding:7px 8px;color:#64748B;
+                         font-variant-numeric:tabular-nums;">{r['total']:,}</td>
+              <td style="text-align:right;padding:7px 8px;color:#16A34A;
+                         font-variant-numeric:tabular-nums;">{r['pct_prot']:.1f}%</td>
+              <td style="text-align:right;padding:7px 8px;color:#D97706;
+                         font-variant-numeric:tabular-nums;">{r['pct_sobre']:.1f}%</td>
+              <td style="text-align:right;padding:7px 8px;color:#D50032;
+                         font-variant-numeric:tabular-nums;">{r['pct_desp']:.1f}%</td>
+              <td style="text-align:right;padding:7px 8px;font-weight:700;
+                         font-variant-numeric:tabular-nums;color:{score_col};">{r['score']:.0f}</td>
+              <td style="text-align:center;padding:7px 8px;">{_badge(r['score'])}</td>
+            </tr>"""
+        rows_html += "</tbody></table></div>"
+        st.markdown(rows_html, unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)  # cierra .cips-canvas
 
 
 # ══════════════════════════════════════════════════════════════════════════════
