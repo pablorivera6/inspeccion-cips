@@ -680,9 +680,9 @@ def animated_kpi_row(items):
         <div style="background:white;border:1px solid #E2E8F0;border-radius:10px;
                     padding:1rem 1.1rem;
                     animation:fadeUp 0.3s ease-out {i*0.06:.2f}s both;">
-          <p style="font-size:0.6875rem;text-transform:uppercase;font-weight:600;
+          <p style="font-size:var(--text-xs);text-transform:uppercase;font-weight:600;
                     color:#94A3B8;letter-spacing:0.1em;margin:0 0 6px 0;">{label}</p>
-          <p style="font-size:1.375rem;font-weight:700;color:{color};margin:0;
+          <p style="font-size:var(--text-lg);font-weight:700;color:{color};margin:0;
                     font-variant-numeric:tabular-nums;">
             {display}
           </p>
@@ -1157,7 +1157,7 @@ def render_cips_comparativo(actual_list, historico_list):
                 display:flex;align-items:center;justify-content:space-between;
                 flex-wrap:wrap;gap:0.8rem;margin-bottom:1.2rem;">
       <div>
-        <div style="font-size:0.6875rem;color:#94A3B8;font-weight:600;
+        <div style="font-size:var(--text-xs);color:#94A3B8;font-weight:600;
                     text-transform:uppercase;letter-spacing:0.12em;margin-bottom:3px;">
           PCC Integrity · CIPS
         </div>
@@ -1168,15 +1168,15 @@ def render_cips_comparativo(actual_list, historico_list):
       <div style="display:flex;gap:0.6rem;">
         <div style="background:#FFF5F6;border:1px solid #FECDD3;border-radius:8px;
                     padding:0.5rem 0.9rem;text-align:center;">
-          <div style="font-size:1.1rem;font-weight:800;color:#D50032;">{len(actual_list)}</div>
-          <div style="font-size:0.6rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
-          <div style="font-size:0.65rem;color:#D50032;font-weight:600;">{n_act:,} pts</div>
+          <div style="font-size:var(--text-md);font-weight:800;color:#D50032;">{len(actual_list)}</div>
+          <div style="font-size:var(--text-xs);color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;">Actuales</div>
+          <div style="font-size:var(--text-xs);color:#D50032;font-weight:600;">{n_act:,} pts</div>
         </div>
         <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:8px;
                     padding:0.5rem 0.9rem;text-align:center;">
-          <div style="font-size:1.1rem;font-weight:800;color:#475569;">{len(historico_list)}</div>
-          <div style="font-size:0.6rem;color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;">Históricos</div>
-          <div style="font-size:0.65rem;color:#64748B;">{n_his:,} pts</div>
+          <div style="font-size:var(--text-md);font-weight:800;color:#475569;">{len(historico_list)}</div>
+          <div style="font-size:var(--text-xs);color:#94A3B8;text-transform:uppercase;letter-spacing:0.08em;">Históricos</div>
+          <div style="font-size:var(--text-xs);color:#64748B;">{n_his:,} pts</div>
         </div>
       </div>
     </div>
@@ -1306,7 +1306,7 @@ def render_cips_comparativo(actual_list, historico_list):
             )
             st.plotly_chart(fig_map, use_container_width=True)
         else:
-            st.markdown('<p style="color:#475569;font-size:0.85rem;">Sin coordenadas GPS disponibles.</p>',
+            st.markdown('<p style="color:#475569;font-size:var(--text-base);">Sin coordenadas GPS disponibles.</p>',
                         unsafe_allow_html=True)
 
     # ── Perfil Off mV ──────────────────────────────────────────────────────────
@@ -1449,25 +1449,25 @@ def render_cips_dashboard(d):
                 box-shadow:0 4px 16px -4px rgba(0,0,0,0.06);
                 display:flex;align-items:center;justify-content:space-between;">
       <div>
-        <div style="font-size:0.7rem;color:#D50032;font-weight:700;
+        <div style="font-size:var(--text-sm);color:#D50032;font-weight:700;
                     text-transform:uppercase;letter-spacing:0.12em;margin-bottom:4px;">
           Inspección CIPS
         </div>
-        <div style="font-size:1.3rem;font-weight:800;color:#0F172A;letter-spacing:-0.02em;">
+        <div style="font-size:var(--text-lg);font-weight:800;color:#0F172A;letter-spacing:-0.02em;">
           {tramo}
         </div>
-        <div style="font-size:0.85rem;color:#64748B;margin-top:4px;">
+        <div style="font-size:var(--text-base);color:#64748B;margin-top:4px;">
           {fecha} &nbsp;·&nbsp; {total:,} puntos medidos
         </div>
       </div>
       <div style="display:flex;gap:1.2rem;text-align:center;">
         <div style="background:#F8FAFC;border:1px solid #E2E8F0;border-radius:10px;padding:0.65rem 1.1rem;">
-          <div style="font-size:1.4rem;font-weight:800;color:#374151;">{pct_p}</div>
-          <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">Protegido</div>
+          <div style="font-size:var(--text-lg);font-weight:800;color:#374151;">{pct_p}</div>
+          <div style="font-size:var(--text-xs);color:#64748B;text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">Protegido</div>
         </div>
         <div style="background:#FFF5F6;border:1px solid #FECDD3;border-radius:10px;padding:0.65rem 1.1rem;">
-          <div style="font-size:1.4rem;font-weight:800;color:#D50032;">{pct_d}</div>
-          <div style="font-size:0.68rem;color:#64748B;text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">Desprotegido</div>
+          <div style="font-size:var(--text-lg);font-weight:800;color:#D50032;">{pct_d}</div>
+          <div style="font-size:var(--text-xs);color:#64748B;text-transform:uppercase;letter-spacing:0.08em;margin-top:2px;">Desprotegido</div>
         </div>
       </div>
     </div>
@@ -1488,7 +1488,7 @@ def render_cips_dashboard(d):
         st.markdown("""
         <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;
                     padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);">
-          <p style="font-size:0.72rem;text-transform:uppercase;font-weight:700;
+          <p style="font-size:var(--text-sm);text-transform:uppercase;font-weight:700;
                     color:#64748B;letter-spacing:0.08em;margin:0 0 0.8rem 0;">
             Estado CP
           </p>
@@ -1503,7 +1503,7 @@ def render_cips_dashboard(d):
             est_sel = []
 
         st.markdown("""
-          <p style="font-size:0.72rem;text-transform:uppercase;font-weight:700;
+          <p style="font-size:var(--text-sm);text-transform:uppercase;font-weight:700;
                     color:#64748B;letter-spacing:0.08em;margin:0.9rem 0 0.4rem 0;">
             Rango PK (m)
           </p>
@@ -1550,7 +1550,7 @@ def render_cips_dashboard(d):
         st.markdown(f"""
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
           <p class="pbi-title" style="margin:0;">Datos de medición</p>
-          <span style="font-size:0.75rem;color:#64748B;font-weight:600;
+          <span style="font-size:var(--text-sm);color:#64748B;font-weight:600;
                        background:#F1F5F9;padding:2px 10px;border-radius:20px;">
             {n_fil:,} pts
           </span>
@@ -1614,8 +1614,8 @@ def render_cips_dashboard(d):
                         background:#F8FAFC;border-radius:10px;border:1px dashed #CBD5E1;">
               <div style="text-align:center;color:#94A3B8;">
                 <div style="font-size:2rem;margin-bottom:0.5rem;">📍</div>
-                <div style="font-size:0.9rem;font-weight:500;">Sin coordenadas GPS</div>
-                <div style="font-size:0.8rem;margin-top:4px;">El archivo no tiene columnas Latitude/Longitude</div>
+                <div style="font-size:var(--text-base);font-weight:500;">Sin coordenadas GPS</div>
+                <div style="font-size:var(--text-sm);margin-top:4px;">El archivo no tiene columnas Latitude/Longitude</div>
               </div>
             </div>""", unsafe_allow_html=True)
 
@@ -1891,10 +1891,10 @@ def sidebar():
         else:
             st.markdown(f"""
             <div style="padding:1.5rem 1rem 1rem;border-bottom:1px solid #E2E8F0;margin-bottom:1rem;">
-              <div style="font-size:1.4rem;font-weight:800;color:{C_RED};letter-spacing:-0.5px;">
+              <div style="font-size:var(--text-lg);font-weight:800;color:{C_RED};letter-spacing:-0.5px;">
                 Protección <span style="font-weight:400;color:#0F172A;">Catódica de Colombia</span>
               </div>
-              <div style="font-size:0.75rem;color:#64748B;letter-spacing:0.08em;margin-top:4px;font-weight:600;">
+              <div style="font-size:var(--text-sm);color:#64748B;letter-spacing:0.08em;margin-top:4px;font-weight:600;">
                 CATHODIC PROTECTION DASHBOARD
               </div>
             </div>
@@ -1914,7 +1914,7 @@ def sidebar():
 
         # ── Controles según modo ──────────────────────────────────────────────
         if modo == "PAP / DCVG":
-            st.markdown('<p style="font-size:0.8rem;font-weight:600;color:#475569;margin:0.5rem 0;">CARGAR ARCHIVOS</p>',
+            st.markdown('<p style="font-size:var(--text-sm);font-weight:600;color:#475569;margin:0.5rem 0;">CARGAR ARCHIVOS</p>',
                         unsafe_allow_html=True)
             uploaded = st.file_uploader("Excel FastField", type=["xlsx"],
                                         accept_multiple_files=True,
@@ -1944,7 +1944,7 @@ def sidebar():
                 for d in inspecciones:
                     by_tramo.setdefault(d["meta"]["tramo"], []).append(d)
                 for tramo, items in by_tramo.items():
-                    st.markdown(f'<p style="font-size:0.67rem;color:#999;text-transform:uppercase;'
+                    st.markdown(f'<p style="font-size:var(--text-xs);color:#999;text-transform:uppercase;'
                                 f'letter-spacing:0.08em;margin:0.7rem 0 0.2rem;">{tramo}</p>',
                                 unsafe_allow_html=True)
                     for d in items:
@@ -1955,10 +1955,10 @@ def sidebar():
                           <span style="width:6px;height:6px;border-radius:50%;
                                        background:{dot_color};margin-top:5px;flex-shrink:0;"></span>
                           <div>
-                            <div style="font-size:0.8125rem;font-weight:600;color:#0F172A;">
+                            <div style="font-size:var(--text-sm);font-weight:600;color:#0F172A;">
                               {d['tipo']} — {d['meta']['fecha']}
                             </div>
-                            <div style="font-size:0.75rem;color:#94A3B8;margin-top:1px;">
+                            <div style="font-size:var(--text-sm);color:#94A3B8;margin-top:1px;">
                               {d['meta']['inspector']} · {len(d['df'])} pts
                             </div>
                           </div>
@@ -2004,7 +2004,7 @@ def sidebar():
                     (actual_list if cat == "ACTUAL" else historico_list).append(d)
 
             # 4. Archivos subidos manualmente
-            st.markdown('<p style="font-size:0.75rem;font-weight:600;color:#475569;'
+            st.markdown('<p style="font-size:var(--text-sm);font-weight:600;color:#475569;'
                         'margin:0.3rem 0 0.2rem;">SUBIR ARCHIVOS ADICIONALES</p>',
                         unsafe_allow_html=True)
             uploaded_cips = st.file_uploader("Excel CIPS", type=["xlsx"],
@@ -2027,7 +2027,7 @@ def sidebar():
                 for label, lst, color in [("ACTUALES", actual_list, "#D50032"),
                                            ("HISTÓRICOS", historico_list, "#6B7280")]:
                     if not lst: continue
-                    st.markdown(f'<p style="font-size:0.67rem;color:{color};font-weight:700;'
+                    st.markdown(f'<p style="font-size:var(--text-xs);color:{color};font-weight:700;'
                                 f'letter-spacing:0.08em;margin:0.5rem 0 0.2rem;">{label}</p>',
                                 unsafe_allow_html=True)
                     for d in lst:
@@ -2037,10 +2037,10 @@ def sidebar():
                           <span style="width:6px;height:6px;border-radius:50%;
                                        background:{color};margin-top:5px;flex-shrink:0;"></span>
                           <div>
-                            <div style="font-size:0.8125rem;font-weight:600;color:#0F172A;">
+                            <div style="font-size:var(--text-sm);font-weight:600;color:#0F172A;">
                               {d['tramo'][:28]}
                             </div>
-                            <div style="font-size:0.75rem;color:#94A3B8;margin-top:1px;">
+                            <div style="font-size:var(--text-sm);color:#94A3B8;margin-top:1px;">
                               {d['fecha']} · {len(d['df']):,} pts
                             </div>
                           </div>
@@ -2195,7 +2195,7 @@ def main():
                         border-radius:16px;border:1px dashed #CBD5E1;
                         box-shadow:0 4px 6px rgba(0,0,0,0.02);animation:fadeUp 0.5s ease-out forwards;">
               <h2 style="color:#0F172A;margin-bottom:0.8rem;font-weight:700;">Dashboard PAP / DCVG</h2>
-              <p style="color:#64748B;font-size:1.1rem;line-height:1.6;max-width:500px;margin:0 auto;">
+              <p style="color:#64748B;font-size:var(--text-md);line-height:1.6;max-width:500px;margin:0 auto;">
                 Sube los archivos <b>.xlsx</b> exportados desde FastField usando el panel lateral.<br>
                 La app detectará automáticamente si es <b>PAP</b> o <b>DCVG</b> y organizará los datos por tramo.
               </p>
@@ -2218,7 +2218,7 @@ def main():
                         for d in pap_list}
                 with st.sidebar:
                     st.markdown('<hr style="border-color:#E0E0E0;margin:0.6rem 0;">', unsafe_allow_html=True)
-                    st.markdown('<p style="font-size:0.72rem;color:#888;margin-bottom:0.2rem;">SELECCIONAR PAP</p>',
+                    st.markdown('<p style="font-size:var(--text-sm);color:#888;margin-bottom:0.2rem;">SELECCIONAR PAP</p>',
                                 unsafe_allow_html=True)
                     sel_pap = opts[st.selectbox("PAP", list(opts.keys()),
                                                  label_visibility="collapsed")]
@@ -2234,7 +2234,7 @@ def main():
                         for d in dcvg_list}
                 with st.sidebar:
                     st.markdown('<hr style="border-color:#E0E0E0;margin:0.6rem 0;">', unsafe_allow_html=True)
-                    st.markdown('<p style="font-size:0.72rem;color:#888;margin-bottom:0.2rem;">SELECCIONAR DCVG</p>',
+                    st.markdown('<p style="font-size:var(--text-sm);color:#888;margin-bottom:0.2rem;">SELECCIONAR DCVG</p>',
                                 unsafe_allow_html=True)
                     sel_dcvg = opts[st.selectbox("DCVG", list(opts.keys()),
                                                   label_visibility="collapsed")]
@@ -2249,7 +2249,7 @@ def main():
             <div style="margin-top:4rem;text-align:center;padding:4rem;background:white;
                         border-radius:16px;border:1px dashed #CBD5E1;animation:fadeUp 0.5s ease-out forwards;">
               <h2 style="color:#0F172A;margin-bottom:0.8rem;font-weight:700;">Dashboard CIPS</h2>
-              <p style="color:#64748B;font-size:1.1rem;line-height:1.6;max-width:520px;margin:0 auto;">
+              <p style="color:#64748B;font-size:var(--text-md);line-height:1.6;max-width:520px;margin:0 auto;">
                 Los archivos se sincronizan automáticamente desde SharePoint.<br>
                 También puedes subir archivos <b>.xlsx</b> manualmente desde el panel lateral.
               </p>
@@ -2262,7 +2262,7 @@ def main():
         # Detalle de inspección individual (selector)
         if todos:
             divider()
-            st.markdown('<p style="font-size:0.85rem;font-weight:600;color:#475569;margin-bottom:0.4rem;">VER DETALLE DE INSPECCIÓN</p>',
+            st.markdown('<p style="font-size:var(--text-base);font-weight:600;color:#475569;margin-bottom:0.4rem;">VER DETALLE DE INSPECCIÓN</p>',
                         unsafe_allow_html=True)
             opts = {f"{'🔴' if d['categoria']=='ACTUAL' else '⬜'} {d['tramo']} — {d['fecha']}": d
                     for d in todos}
