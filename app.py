@@ -59,283 +59,199 @@ CIPS_TXT2  = "#94A3B8"
 # ── CSS unificado ──────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  /* ── Design tokens ────────────────────────────────────────────────────── */
+  :root {
+    --brand:        #B91C1C;   /* chrome de marca: logo, botones          */
+    --data-ok:      #16A34A;   /* PROTEGIDO (dato, nunca chrome)           */
+    --data-warn:    #D97706;   /* SOBREPROTEGIDO                           */
+    --data-crit:    #DC2626;   /* DESPROTEGIDO                             */
+    --data-none:    #94A3B8;   /* sin dato                                 */
+    --surf-0:       #F8FAFC;   /* fondo principal                          */
+    --surf-1:       #FFFFFF;   /* cards                                    */
+    --surf-2:       #F1F5F9;   /* sidebar, inputs, table header            */
+    --bord:         #E2E8F0;   /* divisores                                */
+    --text-1:       #0F172A;   /* títulos                                  */
+    --text-2:       #475569;   /* labels                                   */
+    --text-3:       #94A3B8;   /* metadatos                                */
 
-  html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
-  .stApp { background: #F8FAFC; }
-  .block-container { padding: 1.8rem 2.5rem 1rem 2.5rem !important; max-width: 1600px; }
+    /* Escala tipográfica: 6 pasos, ratio 1.15 */
+    --text-xs:   0.6875rem;  /* 11px */
+    --text-sm:   0.8125rem;  /* 13px */
+    --text-base: 0.875rem;   /* 14px */
+    --text-md:   1rem;       /* 16px */
+    --text-lg:   1.375rem;   /* 22px */
+    --text-xl:   2rem;       /* 32px */
 
-  /* Scrollbar refinada */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
-  ::-webkit-scrollbar-track { background: #F1F5F9; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+    /* Espaciado (escala 4px) */
+    --sp-1: 4px;   --sp-2: 8px;  --sp-3: 12px;
+    --sp-4: 16px;  --sp-6: 24px; --sp-8: 32px;
+  }
 
-  /* ── Keyframes ─────────────────────────────────────────────────────────── */
+  /* ── Animaciones: solo 3 ─────────────────────────────────────────────── */
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(12px); }
     to   { opacity: 1; transform: translateY(0); }
   }
-  @keyframes fadeIn {
-    from { opacity: 0; }
-    to   { opacity: 1; }
-  }
-  @keyframes slideInLeft {
-    from { opacity: 0; transform: translateX(-24px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes slideInRight {
-    from { opacity: 0; transform: translateX(24px); }
-    to   { opacity: 1; transform: translateX(0); }
-  }
-  @keyframes scaleIn {
-    from { opacity: 0; transform: scale(0.88); }
-    to   { opacity: 1; transform: scale(1); }
-  }
-  @keyframes pulseGlow {
-    0%, 100% { box-shadow: 0 4px 6px -1px rgba(0,0,0,0.04); }
-    50%       { box-shadow: 0 8px 30px -4px rgba(213,0,50,0.18); }
-  }
-  @keyframes gradientShift {
-    0%   { background-position: 0% 50%; }
-    50%  { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
-  }
-  @keyframes dotPulse {
-    0%, 100% { transform: scale(1); opacity: 1; }
-    50%       { transform: scale(1.35); opacity: 0.75; }
+  @keyframes barGrow {
+    from { transform: scaleX(0); transform-origin: left; }
+    to   { transform: scaleX(1); transform-origin: left; }
   }
   @keyframes shimmer {
     0%   { background-position: -400px 0; }
-    100% { background-position: 400px 0; }
-  }
-  @keyframes borderDraw {
-    from { opacity: 0; transform: scaleX(0); transform-origin: left; }
-    to   { opacity: 1; transform: scaleX(1); }
-  }
-  @keyframes countPop {
-    0%   { transform: scale(0.6); opacity: 0; }
-    70%  { transform: scale(1.08); }
-    100% { transform: scale(1);   opacity: 1; }
-  }
-  @keyframes footerSlide {
-    from { opacity: 0; transform: translateY(30px); }
-    to   { opacity: 1; transform: translateY(0); }
+    100% { background-position:  400px 0; }
   }
 
-  /* ── Sidebar ───────────────────────────────────────────────────────────── */
+  /* ── Base ────────────────────────────────────────────────────────────── */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  html, body, [class*="css"] { font-family: 'Inter', sans-serif !important; }
+  .stApp { background: var(--surf-0); }
+  .block-container { padding: 1.8rem 2.5rem 1rem !important; max-width: 1600px; }
+
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
+  ::-webkit-scrollbar-track { background: var(--surf-2); }
+  ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+  /* ── Sidebar ─────────────────────────────────────────────────────────── */
   [data-testid="stSidebar"] > div:first-child {
-    background: #FFFFFF;
-    border-right: 1px solid #E2E8F0;
-    box-shadow: 2px 0 14px rgba(0,0,0,0.04);
-    animation: slideInLeft 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
+    background: var(--surf-1);
+    border-right: 1px solid var(--bord);
   }
-  [data-testid="stSidebar"] * { color: #1E293B !important; }
-  [data-testid="stSidebar"] hr { border-color: #E2E8F0; }
+  [data-testid="stSidebar"] * { color: var(--text-1) !important; }
+  [data-testid="stSidebar"] hr { border-color: var(--bord); }
   [data-testid="stSidebar"] [data-testid="stRadio"] label {
-    font-size: 0.88rem !important; font-weight: 600 !important;
-    transition: color 0.2s ease !important;
+    font-size: var(--text-base) !important;
+    font-weight: 500 !important;
+  }
+  [data-testid="stSidebar"] [data-testid="stFileUploader"] {
+    background: var(--surf-2) !important; border-radius: 8px !important;
   }
 
-  /* ── Títulos de sección ────────────────────────────────────────────────── */
+  /* ── Títulos de sección ──────────────────────────────────────────────── */
   .pbi-title {
-    font-size: 1rem; font-weight: 600; color: #0F172A;
-    margin: 1.2rem 0 0.8rem 0; letter-spacing: -0.01em;
-    animation: fadeIn 0.5s ease-out forwards;
-    position: relative; padding-left: 10px;
-  }
-  .pbi-title::before {
-    content: '';
-    position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-    width: 3px; height: 70%; border-radius: 4px;
-    background: #D50032;
-    animation: borderDraw 0.4s ease-out 0.2s both;
+    font-size: var(--text-md); font-weight: 600; color: var(--text-1);
+    margin: var(--sp-8) 0 var(--sp-4) 0;
   }
 
-  /* ── Header principal ──────────────────────────────────────────────────── */
+  /* ── Header principal (PAP/DCVG) ─────────────────────────────────────── */
   .main-header {
-    background: linear-gradient(135deg, #ffffff 0%, #fafcff 100%);
-    padding: 1.2rem 1.8rem;
-    border-radius: 14px;
-    border: 1px solid #E2E8F0;
-    border-left: 4px solid #D50032;
-    box-shadow: 0 4px 16px -4px rgba(0,0,0,0.06);
+    background: var(--surf-1);
+    padding: var(--sp-4) var(--sp-6);
+    border-radius: 10px;
+    border: 1px solid var(--bord);
     display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 1.5rem;
-    animation: fadeUp 0.5s cubic-bezier(.22,.68,0,1.2) forwards;
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
-  }
-  .main-header:hover {
-    box-shadow: 0 8px 28px -6px rgba(213,0,50,0.12);
-    transform: translateY(-1px);
+    margin-bottom: var(--sp-6);
   }
   .main-header-title {
-    font-size: 1.3rem; font-weight: 700; color: #D50032;
-    margin: 0; display: flex; align-items: center; gap: 0.6rem;
+    font-size: var(--text-md); font-weight: 700; color: var(--text-1);
+    margin: 0; display: flex; align-items: center; gap: var(--sp-2);
   }
-  .main-header-meta { font-size: 0.9rem; color: #64748B; font-weight: 500; }
+  .main-header-meta {
+    font-size: var(--text-sm); color: var(--text-2); font-weight: 500;
+  }
 
-  /* ── Cards / Stats ─────────────────────────────────────────────────────── */
+  /* ── Stat cards (PAP/DCVG) ───────────────────────────────────────────── */
   .stat-container {
-    background: white; border: 1px solid #E2E8F0; border-radius: 12px;
-    padding: 1.2rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    opacity: 0;
-    animation: scaleIn 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-    cursor: default;
+    background: var(--surf-1); border: 1px solid var(--bord);
+    border-radius: 10px; padding: var(--sp-4);
+    transition: box-shadow 0.15s ease;
   }
-  .stat-container:hover {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: 0 12px 32px -8px rgba(0,0,0,0.12);
-  }
-  .stat-container:nth-child(1) { animation-delay: 0.05s; }
-  .stat-container:nth-child(2) { animation-delay: 0.12s; }
-  .stat-container:nth-child(3) { animation-delay: 0.19s; }
-  .stat-container:nth-child(4) { animation-delay: 0.26s; }
-  .stat-container:nth-child(5) { animation-delay: 0.33s; }
-
+  .stat-container:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
   .stat-label {
-    font-size: 0.75rem; text-transform: uppercase; font-weight: 600;
-    color: #64748B; letter-spacing: 0.05em; margin-bottom: 6px;
+    font-size: var(--text-xs); text-transform: uppercase; font-weight: 600;
+    color: var(--text-3); letter-spacing: 0.08em; margin-bottom: var(--sp-2);
   }
   .stat-val {
-    font-size: 1.6rem; font-weight: 700; color: #0F172A; margin-bottom: 0;
-    animation: countPop 0.5s cubic-bezier(.22,.68,0,1.2) 0.3s both;
+    font-size: var(--text-lg); font-weight: 700; color: var(--text-1);
   }
 
-  /* ── Estado list + dots ────────────────────────────────────────────────── */
+  /* ── Estado list ─────────────────────────────────────────────────────── */
   .estado-item {
-    display: flex; align-items: center; gap: 8px;
-    font-size: 0.85rem; margin: 6px 0; padding: 4px 0;
-    animation: slideInLeft 0.35s ease-out forwards;
-    transition: background 0.2s ease; border-radius: 6px; padding: 4px 6px;
+    display: flex; align-items: center; gap: var(--sp-2);
+    font-size: var(--text-base); padding: 3px 0;
+    transition: background 0.15s ease; border-radius: 6px;
   }
-  .estado-item:hover { background: #F8FAFC; }
-  .dot {
-    width: 10px; height: 10px; border-radius: 50%; display: inline-block;
-    animation: dotPulse 2.5s ease-in-out infinite;
-  }
+  .estado-item:hover { background: var(--surf-2); }
+  .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
-  /* ── Footer ────────────────────────────────────────────────────────────── */
+  /* ── Footer ──────────────────────────────────────────────────────────── */
   .pcc-footer {
-    background: linear-gradient(135deg, #D50032 0%, #8B0000 50%, #A00025 100%);
-    background-size: 200% 200%;
-    color: white; padding: 1.4rem 2rem; margin-top: 3rem; border-radius: 14px;
-    display: flex; align-items: center; gap: 1rem;
-    box-shadow: 0 12px 32px -6px rgba(213,0,50,0.35);
-    animation: footerSlide 0.6s cubic-bezier(.22,.68,0,1.2) 0.2s both,
-               gradientShift 6s ease infinite;
-    transition: box-shadow 0.3s ease;
+    background: var(--brand);
+    color: white; padding: var(--sp-4) var(--sp-6);
+    margin-top: var(--sp-8); border-radius: 10px;
+    display: flex; align-items: center; gap: var(--sp-4);
   }
-  .pcc-footer:hover {
-    box-shadow: 0 16px 40px -6px rgba(213,0,50,0.45);
-  }
-  .pcc-footer-logo {
-    font-size: 1.6rem; font-weight: 800; letter-spacing: -1px;
-    animation: slideInLeft 0.5s cubic-bezier(.22,.68,0,1.2) 0.4s both;
-  }
-  .pcc-footer-text { font-size: 0.95rem; font-weight: 500; opacity: 0.9; }
+  .pcc-footer-logo { font-size: var(--text-md); font-weight: 700; }
+  .pcc-footer-text { font-size: var(--text-sm); opacity: 0.8; }
 
-  /* ── Separadores ───────────────────────────────────────────────────────── */
+  /* ── Separadores ─────────────────────────────────────────────────────── */
   .sec-div {
-    border: none; height: 1px;
-    background: linear-gradient(90deg, transparent, #E2E8F0 20%, #E2E8F0 80%, transparent);
-    margin: 1.5rem 0 1rem 0;
-    animation: borderDraw 0.5s ease-out forwards;
+    height: 1px; background: var(--bord);
+    margin: var(--sp-6) 0 var(--sp-4) 0;
   }
 
-  /* ── Bloques CIPS ──────────────────────────────────────────────────────── */
+  /* ── Bloques CIPS individuales ───────────────────────────────────────── */
   .bloque {
-    background: white; border-radius: 14px; padding: 1.5rem;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.06); margin-bottom: 1rem;
-    animation: fadeUp 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
-    transition: box-shadow 0.25s ease, transform 0.25s ease;
-  }
-  .bloque:hover {
-    box-shadow: 0 8px 28px rgba(0,0,0,0.09);
-    transform: translateY(-2px);
+    background: var(--surf-1); border-radius: 10px;
+    border: 1px solid var(--bord); padding: var(--sp-4);
+    margin-bottom: var(--sp-4);
   }
   .bloque-titulo {
-    font-weight: 700; font-size: 0.85rem; color: #8B0000;
-    text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 1rem;
-    padding-bottom: 0.5rem; border-bottom: 2px solid #F0F2F6;
+    font-weight: 600; font-size: var(--text-xs); color: var(--text-2);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    margin-bottom: var(--sp-4); padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--bord);
   }
 
-  /* ── Métricas CIPS ─────────────────────────────────────────────────────── */
+  /* ── Métricas Streamlit ──────────────────────────────────────────────── */
   [data-testid="stMetric"] {
-    background: white; border-radius: 14px;
-    padding: 1.2rem 1.4rem !important;
-    box-shadow: 0 2px 12px rgba(0,0,0,0.07);
-    animation: scaleIn 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
-    transition: transform 0.25s ease, box-shadow 0.25s ease;
-  }
-  [data-testid="stMetric"]:hover {
-    transform: translateY(-3px) scale(1.01);
-    box-shadow: 0 10px 28px -6px rgba(0,0,0,0.12);
+    background: var(--surf-1); border-radius: 10px;
+    border: 1px solid var(--bord);
+    padding: var(--sp-4) !important;
   }
   [data-testid="stMetricLabel"] {
-    font-size: 0.75rem !important; color: #888 !important;
-    font-weight: 600 !important; text-transform: uppercase; letter-spacing: 0.5px;
+    font-size: var(--text-xs) !important; color: var(--text-3) !important;
+    font-weight: 600 !important; text-transform: uppercase; letter-spacing: 0.08em;
   }
   [data-testid="stMetricValue"] {
-    font-size: 2.2rem !important; font-weight: 800 !important;
-    animation: countPop 0.55s cubic-bezier(.22,.68,0,1.2) 0.15s both;
+    font-size: var(--text-lg) !important; font-weight: 700 !important;
+    color: var(--text-1) !important;
   }
 
-  /* ── Botones ───────────────────────────────────────────────────────────── */
+  /* ── Botones ─────────────────────────────────────────────────────────── */
   .stButton > button {
-    background: linear-gradient(135deg, #b8233e, #d42848) !important;
+    background: var(--brand) !important;
     color: white !important; border: none !important;
-    border-radius: 10px !important; font-weight: 600 !important;
-    box-shadow: 0 4px 14px rgba(123,30,58,0.3) !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    border-radius: 8px !important; font-weight: 600 !important;
+    font-size: var(--text-sm) !important;
+    transition: opacity 0.15s ease !important;
   }
-  .stButton > button:hover {
-    transform: translateY(-2px) scale(1.02) !important;
-    box-shadow: 0 8px 22px rgba(123,30,58,0.4) !important;
-  }
-  .stButton > button:active {
-    transform: translateY(0) scale(0.98) !important;
-  }
+  .stButton > button:hover { opacity: 0.88 !important; }
+  .stButton > button:active { opacity: 0.75 !important; }
   [data-testid="stDownloadButton"] > button {
-    background: linear-gradient(135deg, #1A7A4A, #22A06B) !important;
+    background: #166534 !important;
     color: white !important; border: none !important;
-    border-radius: 10px !important; font-weight: 600 !important;
-    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    border-radius: 8px !important; font-weight: 600 !important;
+    font-size: var(--text-sm) !important;
+    transition: opacity 0.15s ease !important;
   }
-  [data-testid="stDownloadButton"] > button:hover {
-    transform: translateY(-2px) scale(1.02) !important;
-    box-shadow: 0 8px 22px rgba(26,122,74,0.35) !important;
-  }
+  [data-testid="stDownloadButton"] > button:hover { opacity: 0.88 !important; }
 
-  /* ── DataFrames ────────────────────────────────────────────────────────── */
+  /* ── DataFrames ──────────────────────────────────────────────────────── */
   [data-testid="stDataFrame"] {
-    animation: fadeUp 0.55s cubic-bezier(.22,.68,0,1.2) 0.1s both;
-    border-radius: 10px; border: 1px solid #E2E8F0; overflow: hidden;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    transition: box-shadow 0.25s ease;
-  }
-  [data-testid="stDataFrame"]:hover {
-    box-shadow: 0 6px 20px rgba(0,0,0,0.08);
+    border-radius: 10px; border: 1px solid var(--bord); overflow: hidden;
   }
 
-  /* ── Plotly charts ─────────────────────────────────────────────────────── */
-  .js-plotly-plot {
-    animation: scaleIn 0.5s cubic-bezier(.22,.68,0,1.2) 0.1s both;
-    border-radius: 10px;
-  }
+  /* ── Plotly charts ───────────────────────────────────────────────────── */
+  .js-plotly-plot { border-radius: 10px; }
 
-  /* ── Expanders ─────────────────────────────────────────────────────────── */
+  /* ── Expanders ───────────────────────────────────────────────────────── */
   [data-testid="stExpander"] {
-    border-radius: 10px !important; border: 1px solid #E2E8F0 !important;
+    border-radius: 8px !important; border: 1px solid var(--bord) !important;
     overflow: hidden;
-    transition: box-shadow 0.25s ease;
-  }
-  [data-testid="stExpander"]:hover {
-    box-shadow: 0 4px 16px rgba(0,0,0,0.06);
   }
 
-  /* ── Shimmer para SP sync badges ───────────────────────────────────────── */
+  /* ── Shimmer (skeleton para sync SP) ─────────────────────────────────── */
   .sp-badge-shimmer {
     background: linear-gradient(90deg, #F0FFF4 25%, #dcffe8 50%, #F0FFF4 75%);
     background-size: 400px 100%;
@@ -345,230 +261,94 @@ st.markdown("""
   #MainMenu, footer { visibility: hidden; }
   [data-testid="stToolbar"] { visibility: hidden; }
 
-  /* ── CIPS: estilo limpio ───────────────────────────────────────────────── */
-  @keyframes cips-fadeUp {
-    from { opacity:0; transform:translateY(14px); }
-    to   { opacity:1; transform:translateY(0); }
-  }
-  @keyframes cips-barGrow {
-    from { transform: scaleX(0); transform-origin: left; }
-    to   { transform: scaleX(1); transform-origin: left; }
-  }
-  @keyframes cips-countPop {
-    0%   { transform:scale(0.75); opacity:0; }
-    65%  { transform:scale(1.04); }
-    100% { transform:scale(1);    opacity:1; }
-  }
-
+  /* ── CIPS: vista comparativa ─────────────────────────────────────────── */
   .cips-kpi-card {
-    background: white;
-    border: 1px solid #E2E8F0;
-    border-radius: 12px;
-    padding: 1rem 1.2rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-    animation: cips-fadeUp 0.45s cubic-bezier(.22,.68,0,1.2) both;
-    transition: transform 0.2s ease, box-shadow 0.22s ease;
+    background: var(--surf-1);
+    border: 1px solid var(--bord);
+    border-radius: 10px;
+    padding: var(--sp-4);
+    transition: box-shadow 0.15s ease;
     height: 100%;
   }
-  .cips-kpi-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.09);
-  }
+  .cips-kpi-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.07); }
 
   .cips-label {
-    font-size: 0.6rem; font-weight: 700; color: #94A3B8;
-    text-transform: uppercase; letter-spacing: 0.14em; margin-bottom: 6px;
+    font-size: var(--text-xs); font-weight: 600; color: var(--text-3);
+    text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: var(--sp-2);
   }
   .cips-value {
-    font-size: 1.75rem; font-weight: 800; color: #0F172A;
+    font-size: var(--text-lg); font-weight: 700; color: var(--text-1);
     font-variant-numeric: tabular-nums; line-height: 1.1;
-    animation: cips-countPop 0.55s cubic-bezier(.22,.68,0,1.2) 0.25s both;
+    animation: fadeUp 0.3s ease-out both;
   }
   .cips-sub {
-    font-size: 0.7rem; color: #94A3B8; margin-top: 5px;
-    line-height: 1.4;
+    font-size: var(--text-xs); color: var(--text-3);
+    margin-top: var(--sp-1); line-height: 1.4;
   }
 
   .cips-section-title {
-    font-size: 0.65rem; font-weight: 700; color: #64748B;
+    font-size: var(--text-xs); font-weight: 700; color: var(--text-2);
     text-transform: uppercase; letter-spacing: 0.16em;
-    margin: 1.8rem 0 0.9rem; padding-left: 10px;
-    border-left: 3px solid #D50032;
-    animation: cips-fadeUp 0.35s ease both;
+    margin: var(--sp-8) 0 var(--sp-4);
   }
 
-  /* Ranking bars */
-  .cips-bar-row {
-    margin-bottom: 1.1rem;
-    animation: cips-fadeUp 0.45s cubic-bezier(.22,.68,0,1.2) both;
-  }
+  .cips-bar-row { margin-bottom: var(--sp-6); }
   .cips-bar-header {
     display: flex; justify-content: space-between; align-items: center;
-    margin-bottom: 6px; gap: 8px;
+    margin-bottom: var(--sp-2); gap: var(--sp-2);
   }
   .cips-bar-name {
-    font-size: 0.83rem; font-weight: 600; color: #1E293B;
+    font-size: var(--text-sm); font-weight: 600; color: var(--text-1);
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .cips-bar-right {
-    display: flex; align-items: center; gap: 6px; flex-shrink: 0;
-  }
+  .cips-bar-right { display: flex; align-items: center; gap: var(--sp-2); flex-shrink: 0; }
   .cips-bar-score {
-    font-size: 0.78rem; font-weight: 800;
-    font-variant-numeric: tabular-nums; min-width: 24px;
-    text-align: right;
+    font-size: var(--text-sm); font-weight: 700;
+    font-variant-numeric: tabular-nums; min-width: 24px; text-align: right;
   }
   .cips-bar-track {
-    height: 12px; border-radius: 6px; background: #F1F5F9;
+    height: 10px; border-radius: 5px; background: var(--surf-2);
     overflow: hidden; display: flex;
-    box-shadow: inset 0 1px 2px rgba(0,0,0,0.06);
   }
   .cips-bar-seg {
     height: 100%;
-    animation: cips-barGrow 0.75s cubic-bezier(.22,.68,0,1.2) both;
+    animation: barGrow 0.65s ease-out both;
   }
   .cips-bar-meta {
-    font-size: 0.63rem; color: #94A3B8; margin-top: 3px;
-    letter-spacing: 0.01em;
+    font-size: var(--text-xs); color: var(--text-3);
+    margin-top: var(--sp-1);
   }
   .cips-bar-legend {
-    display: flex; gap: 1.2rem; margin-top: 0.9rem;
-    font-size: 0.65rem; color: #94A3B8; flex-wrap: wrap;
+    display: flex; gap: var(--sp-6); margin-top: var(--sp-4);
+    font-size: var(--text-xs); color: var(--text-3); flex-wrap: wrap;
   }
-  .cips-bar-legend span { display: flex; align-items: center; gap: 5px; }
-  .cips-dot {
-    width: 8px; height: 8px; border-radius: 50%; display: inline-block;
-    flex-shrink: 0;
-  }
+  .cips-bar-legend span { display: flex; align-items: center; gap: var(--sp-1); }
+  .cips-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
 
-  /* Badges nivel */
-  .badge-critico  { display:inline-block; background:#FEE2E2; color:#991B1B; padding:2px 9px; border-radius:20px; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; white-space:nowrap; }
-  .badge-moderado { display:inline-block; background:#FEF3C7; color:#92400E; padding:2px 9px; border-radius:20px; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; white-space:nowrap; }
-  .badge-bajo     { display:inline-block; background:#DCFCE7; color:#166534; padding:2px 9px; border-radius:20px; font-size:0.65rem; font-weight:700; letter-spacing:0.05em; white-space:nowrap; }
+  .badge-critico  { display:inline-block; background:#FEE2E2; color:#991B1B; padding:2px 8px; border-radius:20px; font-size:var(--text-xs); font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
+  .badge-moderado { display:inline-block; background:#FEF3C7; color:#92400E; padding:2px 8px; border-radius:20px; font-size:var(--text-xs); font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
+  .badge-bajo     { display:inline-block; background:#DCFCE7; color:#166534; padding:2px 8px; border-radius:20px; font-size:var(--text-xs); font-weight:700; letter-spacing:0.04em; white-space:nowrap; }
 
-  /* Tabla CIPS */
-  .cips-table { width:100%; border-collapse:separate; border-spacing:0; font-size:0.82rem; }
+  .cips-table { width:100%; border-collapse:separate; border-spacing:0; font-size:var(--text-sm); }
   .cips-table thead th {
-    padding:9px 14px;
-    font-size:0.6rem; font-weight:700; color:#94A3B8;
-    text-transform:uppercase; letter-spacing:0.12em;
-    border-bottom: 2px solid #E2E8F0;
-    background: #FAFAFA;
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--text-xs); font-weight: 700; color: var(--text-3);
+    text-transform: uppercase; letter-spacing: 0.1em;
+    border-bottom: 2px solid var(--bord);
+    background: var(--surf-2);
     position: sticky; top: 0;
   }
-  .cips-table thead th:first-child { border-radius:8px 0 0 0; }
-  .cips-table thead th:last-child  { border-radius:0 8px 0 0; }
+  .cips-table thead th:first-child { border-radius: 8px 0 0 0; }
+  .cips-table thead th:last-child  { border-radius: 0 8px 0 0; }
   .cips-table tbody tr { transition: background 0.15s ease; }
-  .cips-table tbody tr:hover td { background:#F8FAFC; }
-  .cips-table tbody td { padding:10px 14px; border-bottom:1px solid #F1F5F9; color:#374151; vertical-align:middle; }
-  .cips-table .num { text-align:right; font-variant-numeric:tabular-nums; font-weight:500; }
-  .cips-table .center { text-align:center; }
+  .cips-table tbody tr:hover td { background: var(--surf-2); }
+  .cips-table tbody td { padding: var(--sp-3) var(--sp-3); border-bottom: 1px solid var(--surf-2); color: var(--text-2); vertical-align: middle; }
+  .cips-table .num { text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+  .cips-table .center { text-align: center; }
   .cips-table tbody tr:last-child td { border-bottom: none; }
-
-  /* Sidebar items */
-  [data-testid="stSidebar"] .element-container { margin-bottom:0 !important; }
-  [data-testid="stSidebar"] [data-testid="stFileUploader"] {
-    background: #F8FAFC !important; border-radius: 8px !important;
-  }
 </style>
 """, unsafe_allow_html=True)
-
-# ── Barra de progreso + animaciones JS globales ────────────────────────────────
-components.html("""
-<style>
-  /* Barra de carga superior */
-  #nprogress-bar {
-    position: fixed; top: 0; left: 0; z-index: 99999;
-    height: 3px; width: 0%;
-    background: linear-gradient(90deg, #D50032, #ff6b6b, #D50032);
-    background-size: 200% 100%;
-    animation: barLoad 1.2s ease-out forwards, gradMove 1s linear infinite;
-    border-radius: 0 3px 3px 0;
-    box-shadow: 0 0 10px rgba(213,0,50,0.6), 0 0 5px rgba(213,0,50,0.4);
-  }
-  @keyframes barLoad {
-    0%   { width: 0%; opacity: 1; }
-    70%  { width: 85%; }
-    100% { width: 100%; opacity: 0; }
-  }
-  @keyframes gradMove {
-    0%   { background-position: 0% 50%; }
-    100% { background-position: 200% 50%; }
-  }
-
-  /* Reveal on scroll */
-  .reveal {
-    opacity: 0;
-    transform: translateY(28px);
-    transition: opacity 0.6s cubic-bezier(.22,.68,0,1.2),
-                transform 0.6s cubic-bezier(.22,.68,0,1.2);
-  }
-  .reveal.visible {
-    opacity: 1;
-    transform: translateY(0);
-  }
-</style>
-
-<div id="nprogress-bar"></div>
-
-<script>
-(function() {
-  // Barra de progreso al cargar
-  var bar = document.getElementById('nprogress-bar');
-  if (bar) {
-    setTimeout(function() { bar.style.opacity = '0'; }, 1300);
-  }
-
-  // Scroll-reveal: aplica a elementos dentro del frame principal
-  function applyReveal() {
-    try {
-      var doc = window.parent.document;
-
-      // Elementos a animar
-      var selectors = [
-        '[data-testid="stDataFrame"]',
-        '.js-plotly-plot',
-        '[data-testid="stMetric"]',
-        '[data-testid="stExpander"]',
-        '[data-testid="stVerticalBlock"] > div > div',
-      ];
-
-      selectors.forEach(function(sel) {
-        doc.querySelectorAll(sel).forEach(function(el) {
-          if (!el.classList.contains('reveal')) {
-            el.classList.add('reveal');
-          }
-        });
-      });
-
-      var observer = new IntersectionObserver(function(entries) {
-        entries.forEach(function(e) {
-          if (e.isIntersecting) {
-            e.target.classList.add('visible');
-            observer.unobserve(e.target);
-          }
-        });
-      }, { threshold: 0.08 });
-
-      doc.querySelectorAll('.reveal').forEach(function(el) {
-        observer.observe(el);
-      });
-
-    } catch(e) {}
-  }
-
-  // Ejecutar en carga y en cada mutación del DOM
-  applyReveal();
-  setTimeout(applyReveal, 600);
-  setTimeout(applyReveal, 1500);
-
-  try {
-    var mo = new MutationObserver(function() { applyReveal(); });
-    mo.observe(window.parent.document.body, { childList: true, subtree: true });
-  } catch(e) {}
-})();
-</script>
-""", height=0)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -897,17 +677,13 @@ def animated_kpi_row(items):
             display = f'<span id="{uid}">{value}</span>'
 
         cards_html += f"""
-        <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;
-                    padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);
-                    border-left:4px solid {color};
-                    animation:scaleIn 0.45s cubic-bezier(.22,.68,0,1.2) {i*0.07:.2f}s both;
-                    transition:transform 0.25s ease,box-shadow 0.25s ease;cursor:default;"
-             onmouseover="this.style.transform='translateY(-4px) scale(1.01)';this.style.boxShadow='0 12px 32px -8px rgba(0,0,0,0.12)'"
-             onmouseout="this.style.transform='';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
-          <p style="font-size:0.72rem;text-transform:uppercase;font-weight:700;
-                    color:#64748B;letter-spacing:0.06em;margin:0 0 6px 0;">{label}</p>
-          <p style="font-size:1.8rem;font-weight:800;color:{color};margin:0;
-                    animation:countPop 0.55s cubic-bezier(.22,.68,0,1.2) {i*0.07+0.2:.2f}s both;">
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:10px;
+                    padding:1rem 1.1rem;
+                    animation:fadeUp 0.3s ease-out {i*0.06:.2f}s both;">
+          <p style="font-size:0.6875rem;text-transform:uppercase;font-weight:600;
+                    color:#94A3B8;letter-spacing:0.1em;margin:0 0 6px 0;">{label}</p>
+          <p style="font-size:1.375rem;font-weight:700;color:{color};margin:0;
+                    font-variant-numeric:tabular-nums;">
             {display}
           </p>
         </div>
@@ -915,36 +691,16 @@ def animated_kpi_row(items):
 
     full_html = f"""
     <style>
-      @keyframes scaleIn {{
-        from {{ opacity:0; transform:scale(0.88); }}
-        to   {{ opacity:1; transform:scale(1); }}
-      }}
-      @keyframes countPop {{
-        0%  {{ transform:scale(0.6); opacity:0; }}
-        70% {{ transform:scale(1.08); }}
-        100%{{ transform:scale(1); opacity:1; }}
+      @keyframes fadeUp {{
+        from {{ opacity:0; transform:translateY(10px); }}
+        to   {{ opacity:1; transform:translateY(0); }}
       }}
     </style>
-    <div style="display:grid;grid-template-columns:repeat({len(items)},1fr);gap:1rem;margin-bottom:1rem;">
+    <div style="display:grid;grid-template-columns:repeat({len(items)},1fr);gap:0.75rem;margin-bottom:1rem;">
       {cards_html}
     </div>
-    <script>
-    function animateCounter(id, target, duration, delay) {{
-      setTimeout(function() {{
-        var el = document.getElementById(id);
-        if (!el) return;
-        var start = 0, step = target / (duration / 16);
-        var timer = setInterval(function() {{
-          start += step;
-          if (start >= target) {{ el.textContent = target.toLocaleString(); clearInterval(timer); }}
-          else {{ el.textContent = Math.floor(start).toLocaleString(); }}
-        }}, 16);
-      }}, delay);
-    }}
-    {js_counters}
-    </script>
     """
-    components.html(full_html, height=110)
+    components.html(full_html, height=100)
 
 def footer():
     st.markdown("""
@@ -1396,18 +1152,16 @@ def render_cips_comparativo(actual_list, historico_list):
     # ── Canvas oscuro ──────────────────────────────────────────────────────────
     # ── Cabecera ───────────────────────────────────────────────────────────────
     st.markdown(f"""
-    <div style="background:white;border:1px solid #E2E8F0;border-radius:14px;
-                border-left:4px solid #D50032;padding:1.1rem 1.6rem;
-                box-shadow:0 2px 10px rgba(0,0,0,0.04);
+    <div style="background:white;border:1px solid #E2E8F0;border-radius:10px;
+                padding:1rem 1.4rem;
                 display:flex;align-items:center;justify-content:space-between;
-                flex-wrap:wrap;gap:0.8rem;margin-bottom:1.2rem;
-                animation:cips-fadeUp 0.5s cubic-bezier(.22,.68,0,1.2) both;">
+                flex-wrap:wrap;gap:0.8rem;margin-bottom:1.2rem;">
       <div>
-        <div style="font-size:0.62rem;color:#D50032;font-weight:700;
-                    text-transform:uppercase;letter-spacing:0.14em;margin-bottom:3px;">
+        <div style="font-size:0.6875rem;color:#94A3B8;font-weight:600;
+                    text-transform:uppercase;letter-spacing:0.12em;margin-bottom:3px;">
           PCC Integrity · CIPS
         </div>
-        <div style="font-size:1.3rem;font-weight:800;color:#0F172A;">
+        <div style="font-size:1rem;font-weight:700;color:#0F172A;">
           Inspecciones — Vista Comparativa
         </div>
       </div>
@@ -1432,8 +1186,8 @@ def render_cips_comparativo(actual_list, historico_list):
     c1, c2, c3, c4, c5 = st.columns(5)
 
     def _kpi(label, val, sub="", accent="#0F172A", border_color="", delay="0s"):
-        border_style = f"border-left:4px solid {border_color};" if border_color else ""
-        return (f'<div class="cips-kpi-card" style="{border_style}animation-delay:{delay};">'
+        # No border-left: estado semántico se comunica con el color del valor
+        return (f'<div class="cips-kpi-card" style="animation-delay:{delay};">'
                 f'<div class="cips-label">{label}</div>'
                 f'<div class="cips-value" style="color:{accent};">{val}</div>'
                 f'<div class="cips-sub">{sub}</div></div>')
@@ -2194,16 +1948,19 @@ def sidebar():
                                 f'letter-spacing:0.08em;margin:0.7rem 0 0.2rem;">{tramo}</p>',
                                 unsafe_allow_html=True)
                     for d in items:
-                        color = C_PROT if d["tipo"]=="PAP" else C_DCVG
+                        dot_color = "#374151" if d["tipo"]=="PAP" else "#6B7280"
                         st.markdown(f"""
-                        <div style="background:white;border:1px solid #E2E8F0;border-radius:6px;
-                                    padding:0.6rem 0.8rem;margin:4px 0;border-left:4px solid {color};
-                                    box-shadow:0 1px 2px rgba(0,0,0,0.02);">
-                          <div style="font-size:0.85rem;font-weight:600;color:#0F172A;">
-                            {d['tipo']} <span style="font-weight:400;color:#64748B;font-size:0.8rem;">— {d['meta']['fecha']}</span>
-                          </div>
-                          <div style="font-size:0.75rem;color:#64748B;margin-top:4px;">
-                            {d['meta']['inspector']} • {len(d['df'])} pts
+                        <div style="display:flex;align-items:flex-start;gap:8px;
+                                    padding:6px 4px;border-bottom:1px solid #F1F5F9;">
+                          <span style="width:6px;height:6px;border-radius:50%;
+                                       background:{dot_color};margin-top:5px;flex-shrink:0;"></span>
+                          <div>
+                            <div style="font-size:0.8125rem;font-weight:600;color:#0F172A;">
+                              {d['tipo']} — {d['meta']['fecha']}
+                            </div>
+                            <div style="font-size:0.75rem;color:#94A3B8;margin-top:1px;">
+                              {d['meta']['inspector']} · {len(d['df'])} pts
+                            </div>
                           </div>
                         </div>""", unsafe_allow_html=True)
 
@@ -2275,13 +2032,17 @@ def sidebar():
                                 unsafe_allow_html=True)
                     for d in lst:
                         st.markdown(f"""
-                        <div style="background:white;border:1px solid #E2E8F0;border-radius:6px;
-                                    padding:0.45rem 0.7rem;margin:3px 0;border-left:3px solid {color};">
-                          <div style="font-size:0.8rem;font-weight:600;color:#0F172A;">
-                            {d['tramo'][:28]}
-                          </div>
-                          <div style="font-size:0.7rem;color:#64748B;margin-top:1px;">
-                            {d['fecha']} · {len(d['df']):,} pts
+                        <div style="display:flex;align-items:flex-start;gap:8px;
+                                    padding:5px 4px;border-bottom:1px solid #F1F5F9;">
+                          <span style="width:6px;height:6px;border-radius:50%;
+                                       background:{color};margin-top:5px;flex-shrink:0;"></span>
+                          <div>
+                            <div style="font-size:0.8125rem;font-weight:600;color:#0F172A;">
+                              {d['tramo'][:28]}
+                            </div>
+                            <div style="font-size:0.75rem;color:#94A3B8;margin-top:1px;">
+                              {d['fecha']} · {len(d['df']):,} pts
+                            </div>
                           </div>
                         </div>""", unsafe_allow_html=True)
 
