@@ -622,25 +622,116 @@ _CIPS_COLS_KEEP = {
     "Estado_CP", "Lat_corr", "Long_corr", "Altitud",
 }
 
+# Columnas objetivo en el Excel CIPS histórico (antes del rename)
+_CIPS_TARGET_RAW = {
+    "KILÓMETRO", "Von [V/CSE]", "Voff [V/CSE]",
+    "POTENCIAL ON [VCSE]", "POTENCIAL INSTANT OFF [VCSE]",
+    "LATITUD", "LONGITUD", "ALTITUD",
+}
+
+def _stream_cips_sheet(buf: io.BytesIO, sheet_name: str, max_rows: int = 50_000) -> pd.DataFrame:
+    """
+    Lee una hoja Excel en modo streaming (openpyxl read_only).
+    Solo extrae columnas CIPS relevantes y submuestrea si hay demasiadas filas.
+    Nunca carga en memoria todas las columnas del archivo.
+    """
+    import openpyxl
+    buf.seek(0)
+    wb = openpyxl.load_workbook(buf, read_only=True, data_only=True)
+    try:
+        ws = wb[sheet_name]
+        rows_iter = iter(ws.rows)
+
+        # Leer las dos primeras filas para detectar en cuál está el encabezado
+        row0 = next(rows_iter, None)
+        row1 = next(rows_iter, None)
+
+        def _cell_str(cell):
+            return str(cell.value).strip() if cell.value is not None else ""
+
+        h0 = [_cell_str(c) for c in row0] if row0 else []
+        h1 = [_cell_str(c) for c in row1] if row1 else []
+
+        if any(h in _CIPS_TARGET_RAW for h in h0):
+            headers, pending = h0, row1   # fila 0 es cabecera, fila 1 es primer dato
+        else:
+            headers, pending = h1, None   # fila 1 es cabecera, datos siguen en iter
+
+        # Índices de las columnas objetivo
+        idx_map = {i: h for i, h in enumerate(headers) if h in _CIPS_TARGET_RAW}
+        if not idx_map:
+            return pd.DataFrame()
+
+        idx_sorted = sorted(idx_map.keys())
+        col_names  = [idx_map[i] for i in idx_sorted]
+
+        def _extract(row):
+            return [row[i].value if i < len(row) else None for i in idx_sorted]
+
+        rows_data = []
+        if pending is not None:
+            v = _extract(pending)
+            if any(x is not None for x in v):
+                rows_data.append(v)
+        for row in rows_iter:
+            v = _extract(row)
+            if any(x is not None for x in v):
+                rows_data.append(v)
+    finally:
+        wb.close()
+
+    if not rows_data:
+        return pd.DataFrame(columns=col_names)
+
+    # Submuestreo si excede el límite
+    if len(rows_data) > max_rows:
+        step = max(1, len(rows_data) // max_rows)
+        rows_data = rows_data[::step]
+
+    return pd.DataFrame(rows_data, columns=col_names)
+
+
+def _get_sheet_names(buf: io.BytesIO):
+    """Lee nombres de hojas desde workbook.xml sin cargar ningún dato de celda."""
+    buf.seek(0)
+    try:
+        with zipfile.ZipFile(buf) as z:
+            xml = z.read("xl/workbook.xml").decode("utf-8", errors="replace")
+            names = re.findall(r'<sheet\b[^>]*\bname="([^"]+)"', xml)
+            return names
+    except Exception:
+        return []
+    finally:
+        buf.seek(0)
+
+
 def load_cips_processed(file, categoria="ACTUAL"):
     """Carga un Excel CIPS — soporta formato FastField (Survey Data) e Histórico (CIPS)."""
     nombre = getattr(file, "name", str(file))
     tramo, fecha = _meta_from_name(nombre)
 
-    xl = pd.ExcelFile(file)
-    getattr(file, "seek", lambda x: None)(0)
+    _seek = getattr(file, "seek", lambda x: None)
 
-    # ── Formato histórico: hoja "CIPS" (detección case-insensitive) ──────────
-    _sheets_upper = {s.upper(): s for s in xl.sheet_names}
-    cips_sheet = _sheets_upper.get("CIPS")
-    if cips_sheet and "Survey Data" not in xl.sheet_names:
-        _seek = getattr(file, "seek", lambda x: None)
+    # Detectar hojas sin cargar datos de celda
+    sheet_names = _get_sheet_names(file) if isinstance(file, io.BytesIO) else []
+    if not sheet_names:
         _seek(0)
-        df0 = pd.read_excel(file, sheet_name=cips_sheet, header=0, nrows=1)
+        sheet_names = pd.ExcelFile(file).sheet_names
         _seek(0)
-        header_row = 0 if "KILÓMETRO" in df0.columns else 1
-        df = pd.read_excel(file, sheet_name=cips_sheet, header=header_row)
-        # Todas las variantes conocidas de nombres de columna
+
+    _sheets_upper = {s.upper(): s for s in sheet_names}
+    cips_sheet    = _sheets_upper.get("CIPS")
+
+    # ── Formato histórico: hoja "CIPS" — lector streaming ────────────────────
+    if cips_sheet and "Survey Data" not in sheet_names:
+        if isinstance(file, io.BytesIO):
+            df = _stream_cips_sheet(file, cips_sheet)
+        else:
+            # Fallback para archivos locales (uploader)
+            _seek(0)
+            df = pd.read_excel(file, sheet_name=cips_sheet)
+            _seek(0)
+
         RENAME_H = {
             "KILÓMETRO":                   "PK_geom_m",
             "Von [V/CSE]":                 "On_mV_limpio",
@@ -2087,7 +2178,7 @@ def _load_one_cips(meta: dict):
     if name in cache:
         return cache[name], None
     try:
-        r = requests.get(meta["url"], timeout=60)
+        r = requests.get(meta["url"], timeout=120)
         if not r.ok:
             return None, f"HTTP {r.status_code}"
         raw = r.content
