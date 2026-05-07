@@ -2202,10 +2202,24 @@ def sidebar():
             for err in meta_errs[:2]:
                 st.warning(f"⚠ {err}", icon=None)
 
-            all_meta = [(m, "ACTUAL")    for m in actual_meta] + \
-                       [(m, "HISTÓRICO") for m in hist_meta]
+            # 2. Opción de cargar históricos (desactivada por defecto)
+            cargar_hist = st.checkbox(
+                f"Incluir históricos ({len(hist_meta)} archivos)",
+                value=False, key="cips_load_hist",
+                disabled=len(hist_meta) == 0,
+            )
+            if not cargar_hist:
+                # Liberar históricos de la caché si estaban cargados
+                cache_now = _cips_cache()
+                hist_names = {m["name"] for m in hist_meta}
+                for name in hist_names:
+                    cache_now.pop(name, None)
 
-            # 2. Cargar archivos uno a uno (session_state como caché)
+            all_meta = [(m, "ACTUAL") for m in actual_meta]
+            if cargar_hist:
+                all_meta += [(m, "HISTÓRICO") for m in hist_meta]
+
+            # 3. Cargar archivos uno a uno (session_state como caché)
             cache   = _cips_cache()
             pending = [m for m, _ in all_meta if m["name"] not in cache]
 
@@ -2224,14 +2238,14 @@ def sidebar():
                     done += 1
                 prog.empty()
 
-            # 3. Construir listas desde caché
+            # 4. Construir listas desde caché
             actual_list, historico_list = [], []
             for m, cat in all_meta:
                 d = cache.get(m["name"])
                 if d:
                     (actual_list if cat == "ACTUAL" else historico_list).append(d)
 
-            # 4. Archivos subidos manualmente
+            # 5. Archivos subidos manualmente
             st.markdown('<p style="font-size:0.75rem;font-weight:600;color:#475569;'
                         'margin:0.3rem 0 0.2rem;">SUBIR ARCHIVOS ADICIONALES</p>',
                         unsafe_allow_html=True)
@@ -2249,7 +2263,7 @@ def sidebar():
                 except Exception:
                     pass
 
-            # 5. Lista de archivos en sidebar
+            # 6. Lista de archivos en sidebar
             if actual_list or historico_list:
                 st.markdown('<hr style="border-color:#E0E0E0;margin:0.5rem 0;">', unsafe_allow_html=True)
                 for label, lst, color in [("ACTUALES", actual_list, "#D50032"),
