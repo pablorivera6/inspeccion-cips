@@ -154,20 +154,15 @@ st.markdown("""
 
   /* ── Header principal ──────────────────────────────────────────────────── */
   .main-header {
-    background: linear-gradient(135deg, #ffffff 0%, #fafcff 100%);
+    background: white;
     padding: 1.2rem 1.8rem;
-    border-radius: 14px;
+    border-radius: 12px;
     border: 1px solid #E2E8F0;
-    border-left: 4px solid #D50032;
-    box-shadow: 0 4px 16px -4px rgba(0,0,0,0.06);
+    border-top: 3px solid #D50032;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     display: flex; align-items: center; justify-content: space-between;
     margin-bottom: 1.5rem;
     animation: fadeUp 0.5s cubic-bezier(.22,.68,0,1.2) forwards;
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
-  }
-  .main-header:hover {
-    box-shadow: 0 8px 28px -6px rgba(213,0,50,0.12);
-    transform: translateY(-1px);
   }
   .main-header-title {
     font-size: 1.3rem; font-weight: 700; color: #D50032;
@@ -185,8 +180,7 @@ st.markdown("""
     cursor: default;
   }
   .stat-container:hover {
-    transform: translateY(-4px) scale(1.01);
-    box-shadow: 0 12px 32px -8px rgba(0,0,0,0.12);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.09);
   }
   .stat-container:nth-child(1) { animation-delay: 0.05s; }
   .stat-container:nth-child(2) { animation-delay: 0.12s; }
@@ -364,8 +358,7 @@ st.markdown("""
     height: 100%;
   }
   .cips-kpi-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.09);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.08);
   }
 
   .cips-label {
@@ -890,16 +883,13 @@ def animated_kpi_row(items):
             display = f'<span id="{uid}">{value}</span>'
 
         cards_html += f"""
-        <div style="background:white;border:1px solid #E2E8F0;border-radius:12px;
-                    padding:1.2rem;box-shadow:0 2px 8px rgba(0,0,0,0.04);
-                    border-left:4px solid {color};
-                    animation:scaleIn 0.45s cubic-bezier(.22,.68,0,1.2) {i*0.07:.2f}s both;
-                    transition:transform 0.25s ease,box-shadow 0.25s ease;cursor:default;"
-             onmouseover="this.style.transform='translateY(-4px) scale(1.01)';this.style.boxShadow='0 12px 32px -8px rgba(0,0,0,0.12)'"
-             onmouseout="this.style.transform='';this.style.boxShadow='0 2px 8px rgba(0,0,0,0.04)'">
-          <p style="font-size:0.72rem;text-transform:uppercase;font-weight:700;
-                    color:#64748B;letter-spacing:0.06em;margin:0 0 6px 0;">{label}</p>
-          <p style="font-size:1.8rem;font-weight:800;color:{color};margin:0;
+        <div style="background:white;border:1px solid #E2E8F0;border-radius:10px;
+                    border-top:3px solid {color};
+                    padding:1.1rem 1.2rem;box-shadow:0 1px 4px rgba(0,0,0,0.04);
+                    animation:scaleIn 0.45s cubic-bezier(.22,.68,0,1.2) {i*0.07:.2f}s both;">
+          <p style="font-size:0.68rem;text-transform:uppercase;font-weight:700;
+                    color:#94A3B8;letter-spacing:0.1em;margin:0 0 6px 0;">{label}</p>
+          <p style="font-size:1.75rem;font-weight:800;color:{color};margin:0;
                     animation:countPop 0.55s cubic-bezier(.22,.68,0,1.2) {i*0.07+0.2:.2f}s both;">
             {display}
           </p>
@@ -988,9 +978,9 @@ def render_pap(d):
         (k5, "Sin medición",      n_no,             "#94A3B8",  "",        "0.33s"),
     ]
     for col, label, val, accent, border, delay in _pap_kpis:
-        pct_val = (val / total * 100) if total and label != "Total puntos" and label != "Sin medición" else None
+        pct_val = (val / total * 100) if total and label not in ("Total puntos", "Sin medición") else None
         sub = f"{pct_val:.1f}%" if pct_val is not None else ""
-        border_style = f"border-left:4px solid {border};" if border else ""
+        border_style = f"border-top:3px solid {border};" if border else "border-top:3px solid #E2E8F0;"
         with col:
             st.markdown(
                 f'<div class="cips-kpi-card" style="{border_style}animation-delay:{delay};">'
@@ -999,11 +989,11 @@ def render_pap(d):
                 f'<div class="cips-sub">{sub}</div></div>',
                 unsafe_allow_html=True)
 
-    col_tbl, col_map, col_right = st.columns([1.1, 2.0, 0.9])
+    col_tbl, col_map, col_right = st.columns([1.0, 2.4, 0.8])
 
     with col_tbl:
-        pbi_title("Abscisa · P Off mV · P On mV · Observaciones")
-        show = ["Abscisa","Off [mV]","On [mV]","Observaciones"]
+        pbi_title("Mediciones")
+        show = ["Abscisa","Off [mV]","On [mV]","Estado","Observaciones"]
         t = df[[c for c in show if c in df.columns]].copy()
         t.columns = [c.replace(" [mV]","") for c in t.columns]
         st.dataframe(t.reset_index(drop=True), use_container_width=True,
@@ -1019,55 +1009,42 @@ def render_pap(d):
                 hover_data={"Abscisa":True,"Off [mV]":True,"On [mV]":True,
                              "Latitud":False,"Longitud":False},
                 zoom=10, height=340, mapbox_style="open-street-map",
+                category_orders={"Estado": ["Sin protección","Sobreprotegido","Protegido","Sin medición"]},
             )
             fig.update_traces(marker=dict(size=8, opacity=0.9))
-            fig.update_layout(margin=dict(t=0,b=0,l=0,r=0),
-                               legend=dict(x=0.01,y=0.99,
-                                           bgcolor="rgba(255,255,255,0.88)",
-                                           borderwidth=1, font_size=10))
+            fig.update_layout(
+                margin=dict(t=0,b=0,l=0,r=0),
+                paper_bgcolor="rgba(0,0,0,0)",
+                legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.95)",
+                            bordercolor="#E2E8F0", borderwidth=1, font_size=10,
+                            font_color="#1E293B"))
             st.plotly_chart(fig, use_container_width=True)
         else:
-            st.info("Sin GPS")
+            st.markdown('<p style="color:#94A3B8;font-size:0.85rem;">Sin coordenadas GPS.</p>',
+                        unsafe_allow_html=True)
 
     with col_right:
-        pbi_title("Estado de protección")
-        st.markdown(f"""
-        <div class="stat-container" style="margin-bottom:1rem;">
-          <p class="stat-label">ESTADO DE PROTECCIÓN</p>
-          <div class="estado-item">
-            <span class="dot" style="background:{C_PROT};"></span>
-            <span style="color:#334155;font-weight:500;">Protegido</span>
-            <span style="margin-left:auto;font-weight:700;color:#0F172A;">{n_prot}</span>
-          </div>
-          <div class="estado-item">
-            <span class="dot" style="background:{C_SOBRE};"></span>
-            <span style="color:#334155;font-weight:500;">Sobreprotegido</span>
-            <span style="margin-left:auto;font-weight:700;color:#0F172A;">{n_sobre}</span>
-          </div>
-          <div class="estado-item">
-            <span class="dot" style="background:{C_SIN};"></span>
-            <span style="color:#334155;font-weight:500;">Sin protección</span>
-            <span style="margin-left:auto;font-weight:700;color:#0F172A;">{n_sin}</span>
-          </div>
-          <div class="estado-item" style="opacity:0.7;">
-            <span class="dot" style="background:#BDBDBD;"></span>
-            <span style="color:#64748B;font-weight:500;">Sin medición</span>
-            <span style="margin-left:auto;font-weight:600;color:#64748B;">{n_no}</span>
-          </div>
-        </div>
-        """, unsafe_allow_html=True)
+        pbi_title("Distribución")
         edo = df["Estado"].value_counts().reset_index()
         edo.columns = ["Estado","Count"]
         fig = px.pie(edo, values="Count", names="Estado",
-                     color="Estado", color_discrete_map=ESTADO_COLORS, hole=0.5)
-        fig.update_layout(height=200, margin=dict(t=0,b=0,l=0,r=0),
-                           paper_bgcolor="white", showlegend=False)
-        fig.update_traces(textposition="outside", textinfo="percent",
-                           hovertemplate="%{label}<br>%{value} pts<extra></extra>")
+                     color="Estado", color_discrete_map=ESTADO_COLORS, hole=0.55)
+        fig.update_layout(
+            height=240, margin=dict(t=8, b=24, l=0, r=0),
+            paper_bgcolor="rgba(0,0,0,0)", showlegend=True,
+            legend=dict(orientation="v", x=0.5, xanchor="center", y=-0.12,
+                        font=dict(size=9, color="#475569"), bgcolor="rgba(0,0,0,0)"))
+        fig.update_traces(textposition="inside", textinfo="percent",
+                           hovertemplate="%{label}<br>%{value} pts (%{percent})<extra></extra>",
+                           textfont_size=10)
+        fig.add_annotation(
+            text=f"<b>{pct_prot:.0f}%</b><br>protegido",
+            x=0.5, y=0.5, xref="paper", yref="paper",
+            showarrow=False, font=dict(size=13, color="#16A34A", family="Inter"))
         st.plotly_chart(fig, use_container_width=True)
 
     divider()
-    pbi_title("P On mV y P Off mV por Abscisa")
+    pbi_title("Perfil de potencial — Off mV y On mV por abscisa")
     pot = df.dropna(subset=["Abscisa_m"]).copy()
     pot = pot[pot["Off [mV]"].notna() | pot["On [mV]"].notna()] if "Off [mV]" in pot else pot
     if not pot.empty:
@@ -1075,11 +1052,11 @@ def render_pap(d):
         if "On [mV]" in pot.columns:
             fig.add_trace(go.Scatter(x=pot["Abscisa_m"], y=pot["On [mV]"],
                 mode="lines+markers", name="P On mV",
-                line=dict(color="#94A3B8", width=1.8), marker=dict(size=4, color="#94A3B8")))
+                line=dict(color="#94A3B8", width=1.4), marker=dict(size=3, color="#94A3B8")))
         if "Off [mV]" in pot.columns:
             fig.add_trace(go.Scatter(x=pot["Abscisa_m"], y=pot["Off [mV]"],
-                mode="lines+markers", name="P Off mV",
-                line=dict(color=C_SOBRE, width=1.8), marker=dict(size=5, color=C_SOBRE)))
+                mode="lines+markers", name="P Off mV (criterio)",
+                line=dict(color="#0F172A", width=2.0), marker=dict(size=5, color="#0F172A")))
         fig.add_hrect(y0=-1200, y1=-850, fillcolor="rgba(22,163,74,0.05)", line_width=0)
         fig.add_hline(y=-850,  line=dict(color="#16A34A", dash="dash", width=1.2),
                       annotation_text="-850 mV", annotation_position="top left",
@@ -1087,7 +1064,7 @@ def render_pap(d):
         fig.add_hline(y=-1200, line=dict(color="#D97706", dash="dash", width=1.2),
                       annotation_text="-1200 mV", annotation_position="top left",
                       annotation_font=dict(size=9, color="#D97706"))
-        st.plotly_chart(apply_chart(fig, 280, "Abscisa (m)", "mV"), use_container_width=True)
+        st.plotly_chart(apply_chart(fig, 320, "Abscisa (m)", "mV Off / On"), use_container_width=True)
 
     has_ir = "IR ON-OFF [mV]" in df.columns and df["IR ON-OFF [mV]"].notna().any()
     has_ac = "Voltaje AC"     in df.columns and df["Voltaje AC"].notna().any()
@@ -1449,7 +1426,7 @@ def render_cips_comparativo(actual_list, historico_list):
     c1, c2, c3, c4, c5 = st.columns(5)
 
     def _kpi(label, val, sub="", accent="#0F172A", border_color="", delay="0s"):
-        border_style = f"border-left:4px solid {border_color};" if border_color else ""
+        border_style = f"border-top:3px solid {border_color};" if border_color else "border-top:3px solid #E2E8F0;"
         return (f'<div class="cips-kpi-card" style="{border_style}animation-delay:{delay};">'
                 f'<div class="cips-label">{label}</div>'
                 f'<div class="cips-value" style="color:{accent};">{val}</div>'
