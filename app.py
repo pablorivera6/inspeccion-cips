@@ -1896,7 +1896,8 @@ def sidebar():
 
         # ── Controles según modo ──────────────────────────────────────────────
         if modo == "PAP / DCVG":
-            st.markdown('<p style="font-size:var(--text-sm);font-weight:600;color:#475569;margin:0.5rem 0;">CARGAR ARCHIVOS</p>',
+            st.markdown('<p style="font-size:var(--text-xs);font-weight:600;color:#94A3B8;'
+                        'text-transform:uppercase;letter-spacing:0.1em;margin:0.5rem 0 0.3rem;">Archivos</p>',
                         unsafe_allow_html=True)
             uploaded = st.file_uploader("Excel FastField", type=["xlsx"],
                                         accept_multiple_files=True,
@@ -1986,8 +1987,9 @@ def sidebar():
                     (actual_list if cat == "ACTUAL" else historico_list).append(d)
 
             # 4. Archivos subidos manualmente
-            st.markdown('<p style="font-size:var(--text-sm);font-weight:600;color:#475569;'
-                        'margin:0.3rem 0 0.2rem;">SUBIR ARCHIVOS ADICIONALES</p>',
+            st.markdown('<p style="font-size:var(--text-xs);font-weight:600;color:#94A3B8;'
+                        'text-transform:uppercase;letter-spacing:0.1em;'
+                        'margin:0.6rem 0 0.2rem;">Subir archivos</p>',
                         unsafe_allow_html=True)
             uploaded_cips = st.file_uploader("Excel CIPS", type=["xlsx"],
                                               accept_multiple_files=True,
