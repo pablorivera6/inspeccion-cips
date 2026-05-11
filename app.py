@@ -2279,6 +2279,16 @@ def sidebar():
             for err in meta_errs[:2]:
                 st.warning(f"⚠ {err}", icon=None)
 
+            # Si existe CSV y XLSX con el mismo nombre base, el CSV tiene prioridad
+            def _dedup_csv(meta_list):
+                csv_bases = {m["name"].rsplit(".", 1)[0].lower() for m in meta_list
+                             if m["name"].lower().endswith(".csv")}
+                return [m for m in meta_list
+                        if not (m["name"].lower().endswith(".xlsx")
+                                and m["name"].rsplit(".", 1)[0].lower() in csv_bases)]
+            actual_meta = _dedup_csv(actual_meta)
+            hist_meta   = _dedup_csv(hist_meta)
+
             # 2. Opción de cargar históricos (desactivada por defecto)
             cargar_hist = st.checkbox(
                 f"Incluir históricos ({len(hist_meta)} archivos)",
