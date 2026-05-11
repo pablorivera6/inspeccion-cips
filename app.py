@@ -1076,28 +1076,65 @@ def render_pap(d):
         show = ["Abscisa","Off [mV]","On [mV]","Estado","Observaciones"]
         t = df[[c for c in show if c in df.columns]].copy()
         t.columns = [c.replace(" [mV]","") for c in t.columns]
-        st.dataframe(t.reset_index(drop=True), use_container_width=True,
-                     height=340, hide_index=True)
+        tbl_event = st.dataframe(
+            t.reset_index(drop=True), use_container_width=True,
+            height=340, hide_index=True,
+            on_select="rerun", selection_mode="single-row")
+        sel_rows = tbl_event.selection.rows if hasattr(tbl_event, "selection") else []
+        sel_idx  = sel_rows[0] if sel_rows else None
+
+    # Punto seleccionado → coordenadas
+    sel_lat, sel_lon, sel_abscisa = None, None, None
+    if sel_idx is not None and sel_idx < len(df):
+        _sr = df.iloc[sel_idx]
+        if pd.notna(_sr.get("Latitud")) and pd.notna(_sr.get("Longitud")):
+            sel_lat, sel_lon = float(_sr["Latitud"]), float(_sr["Longitud"])
+            sel_abscisa = _sr.get("Abscisa", "")
 
     with col_map:
         pbi_title("Distribución geográfica")
-        mdf = df.dropna(subset=["Latitud","Longitud"])
+        mdf = df.dropna(subset=["Latitud","Longitud"]).copy()
         if not mdf.empty:
+            # Puntos sin protección más grandes para que destaquen
+            mdf["_sz"] = mdf["Estado"].apply(
+                lambda x: 16 if x == "Sin protección" else 8)
+
             fig = px.scatter_mapbox(
                 mdf, lat="Latitud", lon="Longitud",
                 color="Estado", color_discrete_map=ESTADO_COLORS,
+                size="_sz", size_max=16,
                 hover_data={"Abscisa":True,"Off [mV]":True,"On [mV]":True,
-                             "Latitud":False,"Longitud":False},
-                zoom=10, height=340, mapbox_style="open-street-map",
-                category_orders={"Estado": ["Sin protección","Sobreprotegido","Protegido","Sin medición"]},
+                             "Latitud":False,"Longitud":False,"_sz":False},
+                height=340,
+                category_orders={"Estado":["Sin protección","Sobreprotegido",
+                                            "Protegido","Sin medición"]},
             )
-            fig.update_traces(marker=dict(size=8, opacity=0.9))
+
+            # Marcador amarillo sobre el punto seleccionado
+            if sel_lat is not None:
+                fig.add_trace(go.Scattermapbox(
+                    lat=[sel_lat], lon=[sel_lon], mode="markers",
+                    marker=dict(size=24, color="#FACC15", opacity=1),
+                    name=f"▶ {sel_abscisa}", hoverinfo="name"))
+                center, zoom = {"lat": sel_lat, "lon": sel_lon}, 14
+            else:
+                center = {"lat": mdf["Latitud"].mean(),
+                          "lon": mdf["Longitud"].mean()}
+                zoom = 10
+
             fig.update_layout(
                 margin=dict(t=0,b=0,l=0,r=0),
                 paper_bgcolor="rgba(0,0,0,0)",
-                legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.95)",
-                            bordercolor="#E2E8F0", borderwidth=1, font_size=10,
-                            font_color="#1E293B"))
+                legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.88)",
+                            bordercolor="#E2E8F0", borderwidth=1,
+                            font_size=10, font_color="#1E293B"),
+                mapbox=dict(
+                    style="white-bg", center=center, zoom=zoom,
+                    layers=[{"below":"traces","sourcetype":"raster",
+                             "sourceattribution":"Imagery © ESRI",
+                             "source":["https://server.arcgisonline.com/ArcGIS/rest/"
+                                       "services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}]
+                ))
             st.plotly_chart(fig, use_container_width=True)
         else:
             st.markdown('<p style="color:#94A3B8;font-size:0.85rem;">Sin coordenadas GPS.</p>',
