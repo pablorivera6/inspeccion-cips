@@ -779,11 +779,14 @@ def load_excel(file, pdf_urls=None):
     xl   = pd.ExcelFile(file)
     root = pd.read_excel(xl, "Root")
     fc   = "Fecha " if "Fecha " in root.columns else "Fecha"
+    def _clean_meta(v):
+        s = str(v).strip()
+        return "—" if s in ("", "nan", "None", "NaN", "NaT") else s
     meta = {
-        "inspector": str(root.get("Personal", pd.Series(["—"])).iloc[0]),
-        "cargo":     str(root.get("Cargo",    pd.Series(["—"])).iloc[0]),
-        "fecha":     str(root[fc].iloc[0]) if fc in root.columns else "—",
-        "form_name": str(root.get("Form Name", pd.Series(["—"])).iloc[0]),
+        "inspector": _clean_meta(root.get("Personal", pd.Series(["—"])).iloc[0]),
+        "cargo":     _clean_meta(root.get("Cargo",    pd.Series(["—"])).iloc[0]),
+        "fecha":     _clean_meta(root[fc].iloc[0]) if fc in root.columns else "—",
+        "form_name": _clean_meta(root.get("Form Name", pd.Series(["—"])).iloc[0]),
     }
     tipo  = "DCVG" if "DCVG" in meta["form_name"].upper() else "PAP"
     sheet = "subform_1" if "subform_1" in xl.sheet_names else xl.sheet_names[-1]
@@ -1028,13 +1031,16 @@ def render_pap(d):
     n_sin   = int((df["Estado"] == "Sin protección").sum())
     n_no    = int((df["Estado"] == "Sin medición").sum())
 
+    _meta_parts = [v for v in [meta['inspector'], meta['cargo'], meta['fecha']]
+                   if v and v != "—"]
+    _meta_str = " • ".join(_meta_parts)
     st.markdown(f"""
     <div class="main-header">
       <div class="main-header-title">
         Inspección PAP <span style="color:#64748B;font-weight:400;margin-left:0.4rem;">| {meta['tramo']}</span>
       </div>
       <div class="main-header-meta">
-        {meta['inspector']} • {meta['cargo']} • {meta['fecha']} • <b style="color:#0F172A;">{total} puntos</b>
+        {_meta_str}{"  •  " if _meta_str else ""}<b style="color:#0F172A;">{total} puntos</b>
       </div>
     </div>
     """, unsafe_allow_html=True)
@@ -1206,7 +1212,7 @@ def render_dcvg(d):
         Inspección DCVG <span style="color:#64748B;font-weight:400;margin-left:0.4rem;">| {meta['tramo']}</span>
       </div>
       <div class="main-header-meta">
-        {meta['inspector']} • {meta['cargo']} • {meta['fecha']} • <b style="color:#0F172A;">{total} puntos</b>
+        {" • ".join(v for v in [meta['inspector'],meta['cargo'],meta['fecha']] if v and v!="—")}  •  <b style="color:#0F172A;">{total} puntos</b>
       </div>
     </div>
     """, unsafe_allow_html=True)
