@@ -127,7 +127,7 @@ st.markdown("""
   [data-testid="stSidebar"] > div:first-child {
     background: #FFFFFF;
     border-right: 1px solid #E2E8F0;
-    box-shadow: 2px 0 18px rgba(0,0,0,0.06);
+    box-shadow: 2px 0 14px rgba(0,0,0,0.04);
     animation: slideInLeft 0.45s cubic-bezier(.22,.68,0,1.2) forwards;
   }
   [data-testid="stSidebar"] * { color: #1E293B !important; }
@@ -136,43 +136,6 @@ st.markdown("""
     font-size: 0.88rem !important; font-weight: 600 !important;
     transition: color 0.2s ease !important;
   }
-
-  /* Logo header en sidebar */
-  .sidebar-brand {
-    background: linear-gradient(160deg, #8B0000 0%, #D50032 60%, #b0002a 100%);
-    margin: -1rem -1rem 0 -1rem;
-    padding: 1.6rem 1.2rem 1.4rem;
-    text-align: center;
-    border-bottom: 3px solid rgba(255,255,255,0.15);
-  }
-  .sidebar-brand img {
-    width: 160px; max-width: 85%;
-    filter: brightness(0) invert(1);
-    margin-bottom: 0.5rem;
-    animation: scaleIn 0.5s cubic-bezier(.22,.68,0,1.2) 0.1s both;
-  }
-  .sidebar-brand-sub {
-    font-size: 0.6rem !important;
-    color: rgba(255,255,255,0.75) !important;
-    font-weight: 700 !important;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-top: 0.2rem;
-  }
-
-  /* Nav pills */
-  .nav-pill {
-    display: flex; align-items: center; gap: 0.6rem;
-    padding: 0.55rem 0.9rem; border-radius: 8px; margin: 0.2rem 0;
-    cursor: pointer; transition: background 0.18s ease;
-    font-size: 0.87rem; font-weight: 600; color: #374151;
-  }
-  .nav-pill:hover { background: #F1F5F9; }
-  .nav-pill.active {
-    background: #FEF2F2; color: #D50032 !important;
-    border-left: 3px solid #D50032;
-  }
-  .nav-pill .pill-icon { font-size: 1rem; }
 
   /* ── Títulos de sección ────────────────────────────────────────────────── */
   .pbi-title {
@@ -1066,33 +1029,10 @@ def animated_kpi_row(items):
     components.html(full_html, height=110)
 
 def footer():
-    logo_b64 = ""
-    if os.path.exists("logo-pcc-hd.png"):
-        with open("logo-pcc-hd.png", "rb") as _f:
-            logo_b64 = base64.b64encode(_f.read()).decode()
-    logo_html = (f'<img src="data:image/png;base64,{logo_b64}" '
-                 f'style="height:38px;filter:brightness(0) invert(1);opacity:0.95;">'
-                 if logo_b64 else
-                 '<span style="font-size:1.3rem;font-weight:800;color:white;">PCC</span>')
-    st.markdown(f"""
+    st.markdown("""
     <div class="pcc-footer">
-      <div style="display:flex;align-items:center;gap:1.2rem;flex:1;">
-        {logo_html}
-        <div style="width:1px;height:36px;background:rgba(255,255,255,0.25);"></div>
-        <div>
-          <div style="font-size:0.95rem;font-weight:700;color:white;letter-spacing:-0.2px;">
-            Protección Catódica de Colombia
-          </div>
-          <div style="font-size:0.72rem;color:rgba(255,255,255,0.7);font-weight:500;
-                      letter-spacing:0.06em;margin-top:2px;">
-            INSPECCIÓN DE CORRIENTE IMPRESA · DASHBOARD TÉCNICO
-          </div>
-        </div>
-      </div>
-      <div style="font-size:0.7rem;color:rgba(255,255,255,0.5);text-align:right;
-                  font-weight:500;letter-spacing:0.04em;">
-        PCC © {__import__('datetime').date.today().year}
-      </div>
+      <span class="pcc-footer-logo">Protección Catódica de Colombia</span>
+      <span class="pcc-footer-text">· Inspección de Corriente Impresa</span>
     </div>
     """, unsafe_allow_html=True)
 
@@ -2454,33 +2394,29 @@ def _sp_token():
 
 def sidebar():
     with st.sidebar:
-        # ── Brand header con logo ─────────────────────────────────────────────
-        logo_b64 = ""
+        # Logo
         if os.path.exists("logo-pcc-hd.png"):
-            with open("logo-pcc-hd.png", "rb") as _f:
-                logo_b64 = base64.b64encode(_f.read()).decode()
-
-        if logo_b64:
-            st.markdown(f"""
-            <div class="sidebar-brand">
-              <img src="data:image/png;base64,{logo_b64}">
-              <div class="sidebar-brand-sub">Dashboard Técnico · CIPS &amp; PAP</div>
+            with open("logo-pcc-hd.png", "rb") as f:
+                b64 = base64.b64encode(f.read()).decode()
+            st.markdown(f'''
+            <div style="padding:1rem 0 0 0;text-align:left;">
+              <img src="data:image/png;base64,{b64}"
+                   style="width:180px;max-width:100%;height:auto;">
             </div>
-            """, unsafe_allow_html=True)
+            ''', unsafe_allow_html=True)
         else:
             st.markdown(f"""
-            <div class="sidebar-brand">
-              <div style="font-size:1.3rem;font-weight:800;color:white;letter-spacing:-0.5px;">
-                Protección Catódica<br><span style="font-weight:400;opacity:0.8;">de Colombia</span>
+            <div style="padding:1.5rem 1rem 1rem;border-bottom:1px solid #E2E8F0;margin-bottom:1rem;">
+              <div style="font-size:1.4rem;font-weight:800;color:{C_RED};letter-spacing:-0.5px;">
+                Protección <span style="font-weight:400;color:#0F172A;">Catódica de Colombia</span>
               </div>
-              <div class="sidebar-brand-sub">Dashboard Técnico · CIPS &amp; PAP</div>
+              <div style="font-size:0.75rem;color:#64748B;letter-spacing:0.08em;margin-top:4px;font-weight:600;">
+                CATHODIC PROTECTION DASHBOARD
+              </div>
             </div>
             """, unsafe_allow_html=True)
 
-        st.markdown('<div style="height:0.8rem;"></div>', unsafe_allow_html=True)
-        st.markdown('<p style="font-size:0.65rem;font-weight:700;color:#94A3B8;'
-                    'letter-spacing:0.14em;margin:0.6rem 0 0.3rem;padding:0 0.2rem;">'
-                    'MÓDULO</p>', unsafe_allow_html=True)
+        st.markdown('<hr style="border-color:#E2E8F0;margin:0.5rem 0;">', unsafe_allow_html=True)
 
         # ── Navegación principal ──
         modo = st.radio(
