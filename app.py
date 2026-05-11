@@ -577,7 +577,7 @@ def _estado_cp(v):
 
 def _meta_from_name(nombre):
     """Extrae tramo y fecha del nombre del archivo."""
-    base = nombre.replace(".xlsx", "")
+    base = nombre.replace(".xlsx", "").replace(".csv", "")
     parts = base.split("_")
     if len(parts) >= 3 and parts[0].upper() == "CIPS":
         fecha_raw = parts[-2] if len(parts) > 2 else ""
@@ -611,9 +611,32 @@ def _finalizar_df(df):
 
 
 def load_cips_processed(file, categoria="ACTUAL"):
-    """Carga un Excel CIPS — soporta formato FastField (Survey Data) e Histórico (CIPS)."""
+    """Carga CIPS — soporta CSV histórico, Excel FastField (Survey Data) y Excel Histórico (CIPS)."""
     nombre = getattr(file, "name", str(file))
     tramo, fecha = _meta_from_name(nombre)
+
+    # ── Formato CSV histórico ─────────────────────────────────────────────────
+    if nombre.lower().endswith(".csv"):
+        df = pd.read_csv(file, encoding="utf-8-sig")
+        RENAME_CSV = {
+            "KILÓMETRO":                    "PK_geom_m",
+            "Von [V/CSE]":                  "On_mV_limpio",
+            "Voff [V/CSE]":                 "Off_mV_limpio",
+            "POTENCIAL ON [VCSE]":          "On_mV_limpio",
+            "POTENCIAL INSTANT OFF [VCSE]": "Off_mV_limpio",
+            "LATITUD":                      "Lat_corr",
+            "LONGITUD":                     "Long_corr",
+            "ALTITUD":                      "Altitud",
+        }
+        df = df.rename(columns={k: v for k, v in RENAME_CSV.items() if k in df.columns})
+        if "PK_geom_m" in df.columns:
+            df["PK_geom_m"] = pd.to_numeric(df["PK_geom_m"], errors="coerce") * 1000
+        df = _finalizar_df(df)
+        df = df.dropna(subset=["PK_geom_m", "Off_mV_limpio"], how="all")
+        if fecha == "—":
+            fecha = "Histórico"
+        return {"df": df, "tramo": tramo, "fecha": fecha,
+                "filename": nombre, "tipo": "CIPS", "categoria": categoria}
 
     xl = pd.ExcelFile(file)
     getattr(file, "seek", lambda x: None)(0)
@@ -2098,7 +2121,7 @@ def fetch_cips_metadata():
                 {"name": it["name"], "url": it["@microsoft.graph.downloadUrl"],
                  "size": it.get("size", 0), "categoria": categoria}
                 for it in resp.get("value", [])
-                if it.get("name","").endswith(".xlsx")
+                if (it.get("name","").endswith(".xlsx") or it.get("name","").endswith(".csv"))
                    and not it.get("name","").startswith("~")
                    and it.get("@microsoft.graph.downloadUrl")
             ]
@@ -2128,7 +2151,10 @@ def _load_one_cips(meta: dict):
             return None, f"HTTP {r.status_code}"
         raw = r.content
         del r; gc.collect()
-        f = _repair_xlsx(raw)
+        if name.lower().endswith(".csv"):
+            f = io.BytesIO(raw)
+        else:
+            f = _repair_xlsx(raw)
         del raw; gc.collect()
         f.name = name
         d = load_cips_processed(f, meta["categoria"])
@@ -2300,7 +2326,7 @@ def sidebar():
             st.markdown('<p style="font-size:0.75rem;font-weight:600;color:#475569;'
                         'margin:0.3rem 0 0.2rem;">SUBIR ARCHIVOS ADICIONALES</p>',
                         unsafe_allow_html=True)
-            uploaded_cips = st.file_uploader("Excel CIPS", type=["xlsx"],
+            uploaded_cips = st.file_uploader("Excel / CSV CIPS", type=["xlsx", "csv"],
                                               accept_multiple_files=True,
                                               label_visibility="collapsed",
                                               key="cips_uploader")
