@@ -2099,8 +2099,6 @@ def render_cips_dashboard(d):
         fig.update_yaxes(showgrid=True, gridcolor="#F1F5F9", zeroline=False)
         st.plotly_chart(fig, use_container_width=True)
 
-    footer()
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # SharePoint — carga automática de PAP/DCVG
@@ -2743,6 +2741,8 @@ def main():
                     file_name=nombre_kmz,
                     mime="application/vnd.google-earth.kmz",
                     key="dl_kmz3d")
+
+        footer()
 
 
 if __name__ == "__main__":
