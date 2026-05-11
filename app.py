@@ -1843,37 +1843,6 @@ def render_cips_comparativo(actual_list, historico_list):
         rows_html += "</tbody></table></div>"
         st.markdown(rows_html, unsafe_allow_html=True)
 
-    # ── Exportar KMZ 3D ───────────────────────────────────────────────────────
-    divider()
-    pbi_title("Exportar KMZ 3D para Google Earth")
-    st.markdown(
-        '<p style="font-size:0.82rem;color:#64748B;margin-bottom:0.8rem;">'
-        'Genera un archivo KMZ con las líneas ON y OFF elevadas según el potencial '
-        '(|mV| × 0.04 m), más las referencias de criterio −850 mV (34 m) y −1200 mV (48 m).'
-        '</p>', unsafe_allow_html=True)
-
-    tramos_disp = {d["tramo"]: d for d in todos if
-                   "Lat_corr" in d["df"].columns and d["df"]["Lat_corr"].notna().sum() > 10}
-
-    if not tramos_disp:
-        st.info("No hay tramos con coordenadas GPS para exportar.")
-    else:
-        sel_tramos = st.multiselect(
-            "Tramos a incluir en el KMZ",
-            options=list(tramos_disp.keys()),
-            default=list(tramos_disp.keys()),
-            key="kmz3d_sel")
-
-        if sel_tramos and st.button("Generar KMZ 3D", key="btn_kmz3d", type="primary"):
-            with st.spinner("Generando KMZ…"):
-                kmz_bytes = _generar_kmz_3d([tramos_disp[t] for t in sel_tramos])
-            nombre_kmz = "CIPS_3D_" + "_".join(sel_tramos[:2]).replace(" ", "-") + ".kmz"
-            st.download_button(
-                "Descargar KMZ 3D",
-                data=kmz_bytes,
-                file_name=nombre_kmz,
-                mime="application/vnd.google-earth.kmz",
-                key="dl_kmz3d")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2742,6 +2711,38 @@ def main():
             sel_key = st.selectbox("Inspección", list(opts.keys()),
                                    label_visibility="collapsed", key="cips_detail_sel")
             render_cips_dashboard(opts[sel_key])
+
+        # ── Exportar KMZ 3D (al final de todo) ───────────────────────────────
+        divider()
+        pbi_title("Exportar KMZ 3D para Google Earth")
+        st.markdown(
+            '<p style="font-size:0.82rem;color:#64748B;margin-bottom:0.8rem;">'
+            'Genera un archivo KMZ con las líneas ON y OFF elevadas según el potencial '
+            '(|mV| × 0.04 m), más las referencias de criterio −850 mV (34 m) y −1200 mV (48 m).'
+            '</p>', unsafe_allow_html=True)
+
+        tramos_disp = {d["tramo"]: d for d in todos if
+                       "Lat_corr" in d["df"].columns and d["df"]["Lat_corr"].notna().sum() > 10}
+
+        if not tramos_disp:
+            st.info("No hay tramos con coordenadas GPS para exportar.")
+        else:
+            sel_tramos = st.multiselect(
+                "Tramos a incluir en el KMZ",
+                options=list(tramos_disp.keys()),
+                default=list(tramos_disp.keys()),
+                key="kmz3d_sel")
+
+            if sel_tramos and st.button("Generar KMZ 3D", key="btn_kmz3d", type="primary"):
+                with st.spinner("Generando KMZ…"):
+                    kmz_bytes = _generar_kmz_3d([tramos_disp[t] for t in sel_tramos])
+                nombre_kmz = "CIPS_3D_" + "_".join(sel_tramos[:2]).replace(" ", "-") + ".kmz"
+                st.download_button(
+                    "Descargar KMZ 3D",
+                    data=kmz_bytes,
+                    file_name=nombre_kmz,
+                    mime="application/vnd.google-earth.kmz",
+                    key="dl_kmz3d")
 
 
 if __name__ == "__main__":
