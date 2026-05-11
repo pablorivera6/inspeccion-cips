@@ -1403,13 +1403,20 @@ def render_resumen(inspecciones):
             hover_data={"_tramo":True,"_tipo":True,"_estado":True,
                         "_insp":True,"Latitud":False,"Longitud":False},
             labels={"_tramo":"Tramo","_tipo":"Tipo","_estado":"Estado","_insp":"Inspector"},
-            zoom=7, height=420, mapbox_style="open-street-map",
+            height=420,
         )
         fig.update_traces(marker=dict(size=7, opacity=0.85))
-        fig.update_layout(margin=dict(t=0,b=0,l=0,r=0),
-                          legend=dict(x=0.01,y=0.99,
-                                      bgcolor="rgba(255,255,255,0.88)",
-                                      bordercolor="#ddd",borderwidth=1))
+        fig.update_layout(
+            margin=dict(t=0,b=0,l=0,r=0),
+            legend=dict(x=0.01,y=0.99,bgcolor="rgba(255,255,255,0.88)",
+                        bordercolor="#ddd",borderwidth=1),
+            mapbox=dict(style="white-bg", zoom=7,
+                        center={"lat": all_pts["Latitud"].mean(),
+                                "lon": all_pts["Longitud"].mean()},
+                        layers=[{"below":"traces","sourcetype":"raster",
+                                 "sourceattribution":"Imagery © ESRI",
+                                 "source":["https://server.arcgisonline.com/ArcGIS/rest/"
+                                           "services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}]))
         st.plotly_chart(fig, use_container_width=True)
 
     divider()
@@ -1754,7 +1761,7 @@ def render_cips_comparativo(actual_list, historico_list):
                 },
                 hover_data={"_tramo": True, "Lat_corr": False, "Long_corr": False,
                             "Estado": False},
-                zoom=6, height=440, mapbox_style="open-street-map",
+                height=440,
                 category_orders={"Estado": ["Desprotegido","Sobreprotegido","Protegido","Sin dato"]},
                 labels={"Estado": "Estado CP", "_tramo": "Tramo"},
             )
@@ -1766,6 +1773,13 @@ def render_cips_comparativo(actual_list, historico_list):
                 legend=dict(x=0.01, y=0.99,
                             bgcolor="rgba(255,255,255,0.95)", font_color="#1E293B",
                             bordercolor="#E2E8F0", borderwidth=1, font_size=11),
+                mapbox=dict(style="white-bg", zoom=6,
+                            center={"lat": all_pts["Lat_corr"].median(),
+                                    "lon": all_pts["Long_corr"].median()},
+                            layers=[{"below":"traces","sourcetype":"raster",
+                                     "sourceattribution":"Imagery © ESRI",
+                                     "source":["https://server.arcgisonline.com/ArcGIS/rest/"
+                                               "services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}]),
             )
             st.plotly_chart(fig_map, use_container_width=True)
         else:
@@ -2059,13 +2073,20 @@ def render_cips_dashboard(d):
                 color="Estado_CP" if "Estado_CP" in mdf.columns else None,
                 color_discrete_map=CIPS_COLORS,
                 hover_data=hover_d,
-                zoom=10, height=410, mapbox_style="open-street-map",
+                height=410,
             )
             fig.update_traces(marker=dict(size=5, opacity=0.92))
             fig.update_layout(
                 margin=dict(t=0,b=0,l=0,r=0),
                 legend=dict(x=0.01, y=0.99, bgcolor="rgba(255,255,255,0.92)",
-                            borderwidth=1, font_size=10, bordercolor="#E2E8F0")
+                            borderwidth=1, font_size=10, bordercolor="#E2E8F0"),
+                mapbox=dict(style="white-bg", zoom=10,
+                            center={"lat": mdf[lat_c].median(),
+                                    "lon": mdf[lon_c].median()},
+                            layers=[{"below":"traces","sourcetype":"raster",
+                                     "sourceattribution":"Imagery © ESRI",
+                                     "source":["https://server.arcgisonline.com/ArcGIS/rest/"
+                                               "services/World_Imagery/MapServer/tile/{z}/{y}/{x}"]}]),
             )
             st.plotly_chart(fig, use_container_width=True)
         else:
