@@ -1553,10 +1553,10 @@ def _generar_kmz_3d(tramos_data: list) -> bytes:
     CL_OFF = "9900ec00"
 
     # Multiplicador de altura: |mV| × SCALE → metros sobre terreno
-    # 0.5 produce ~425m para -850mV → dramáticamente visible en vista oblicua
-    SCALE  = 0.5
-    H_850  = round(850  * SCALE, 1)   # 425 m
-    H_1200 = round(1200 * SCALE, 1)   # 600 m
+    # 0.2 produce ~170m para -850mV → claramente visible en vista oblicua
+    SCALE  = 0.2
+    H_850  = round(850  * SCALE, 1)   # 170 m
+    H_1200 = round(1200 * SCALE, 1)   # 240 m
 
     MAX_PTS = 8000  # máx puntos por tramo para no sobrecargar GEP
 
@@ -1595,7 +1595,7 @@ def _generar_kmz_3d(tramos_data: list) -> bytes:
             return [(float(r.Long_corr), float(r.Lat_corr), float(h))
                     for _, r in df.iterrows()]
 
-        def _add_line(folder, name, coords, color_line, width=4):
+        def _add_line(folder, name, coords, color_line, color_pt, width=3, pt_scale=0.4):
             if len(coords) < 2:
                 return
             sub = folder.newfolder(name=name)
@@ -1605,16 +1605,26 @@ def _generar_kmz_3d(tramos_data: list) -> bytes:
             ls.extrude = 0
             ls.style.linestyle.color = color_line
             ls.style.linestyle.width = width
+            # Puntos individuales (marca cada medición)
+            for coord in coords:
+                pnt = sub.newpoint()
+                pnt.coords = [coord]
+                pnt.altitudemode = simplekml.AltitudeMode.relativetoground
+                pnt.style.iconstyle.color = color_pt
+                pnt.style.iconstyle.scale = pt_scale
+                pnt.style.iconstyle.icon.href = \
+                    "http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png"
+                pnt.style.labelstyle.scale = 0
 
         # ON
         if "On_mV_limpio" in df.columns:
             _add_line(folder, f"{tramo} — ON",
-                      _coords_3d("On_mV_limpio"), CL_ON)
+                      _coords_3d("On_mV_limpio"), CL_ON, C_ON)
 
         # OFF
         if "Off_mV_limpio" in df.columns:
             _add_line(folder, f"{tramo} — OFF",
-                      _coords_3d("Off_mV_limpio"), CL_OFF)
+                      _coords_3d("Off_mV_limpio"), CL_OFF, C_OFF)
 
         # -850 mV (referencia fija a H_850 m)
         sub_850 = folder.newfolder(name=f"{tramo} — −850 mV ({H_850} m)")
@@ -2803,8 +2813,8 @@ def main():
         pbi_title("Exportar KMZ 3D para Google Earth")
         st.markdown(
             '<p style="font-size:0.82rem;color:#64748B;margin-bottom:0.8rem;">'
-            'Genera un KMZ con líneas ON/OFF elevadas (|mV| × 0.5 m) y referencias '
-            '−850 mV a 425 m y −1200 mV a 600 m sobre el terreno.</p>'
+            'Genera un KMZ con líneas ON/OFF elevadas (|mV| × 0.2 m) y referencias '
+            '−850 mV a 170 m y −1200 mV a 240 m sobre el terreno.</p>'
             '<p style="font-size:0.78rem;color:#D97706;margin-bottom:0.8rem;">'
             '<b>Para ver el efecto 3D en Google Earth Pro:</b> abre el KMZ, luego '
             'inclina la vista con <b>clic derecho + arrastrar hacia arriba</b>, '
