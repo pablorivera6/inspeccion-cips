@@ -1544,13 +1544,19 @@ def _generar_kmz_3d(tramos_data: list) -> bytes:
     import simplekml, io as _io
 
     # KML usa AABBGGRR
-    C_ON   = "ffdd630c"   # #0c63dd azul, 100% opaco en puntos
+    C_ON   = "ffdd630c"   # #0c63dd azul
     C_OFF  = "ff00ec00"   # #00ec00 verde
     C_850  = "ff6b68fd"   # #fd686b rojo-rosa
     C_1200 = "ffc77eff"   # #ff7ec7 rosa
-    # Líneas ON/OFF al 20 % de opacidad (alpha 0x33)
-    CL_ON  = "33dd630c"
-    CL_OFF = "3300ec00"
+    # Líneas ON/OFF al 60% de opacidad (alpha 0x99)
+    CL_ON  = "99dd630c"
+    CL_OFF = "9900ec00"
+
+    # Multiplicador de altura: |mV| × SCALE → metros sobre terreno
+    # 0.2 produce ~170m para -850mV → claramente visible en vista oblicua
+    SCALE  = 0.2
+    H_850  = round(850  * SCALE, 1)   # 170 m
+    H_1200 = round(1200 * SCALE, 1)   # 240 m
 
     MAX_PTS = 8000  # máx puntos por tramo para no sobrecargar GEP
 
@@ -1582,11 +1588,11 @@ def _generar_kmz_3d(tramos_data: list) -> bytes:
         def _coords_3d(col):
             rows = df[df[col].notna()]
             return [(float(r.Long_corr), float(r.Lat_corr),
-                     round(abs(float(r[col])) * 0.04, 2))
+                     round(abs(float(r[col])) * SCALE, 2))
                     for _, r in rows.iterrows()]
 
         def _coords_flat(h):
-            return [(float(r.Long_corr), float(r.Lat_corr), h)
+            return [(float(r.Long_corr), float(r.Lat_corr), float(h))
                     for _, r in df.iterrows()]
 
         def _add_line(folder, name, coords, color_line, color_pt, width=3, pt_scale=0.4):
@@ -1620,23 +1626,23 @@ def _generar_kmz_3d(tramos_data: list) -> bytes:
             _add_line(folder, f"{tramo} — OFF",
                       _coords_3d("Off_mV_limpio"), CL_OFF, C_OFF)
 
-        # -850 mV (línea de referencia fija a 34 m)
-        sub_850 = folder.newfolder(name=f"{tramo} — −850 mV")
-        ls_850 = sub_850.newlinestring(name="Criterio −850 mV")
-        ls_850.coords = _coords_flat(34.0)
+        # -850 mV (referencia fija a H_850 m)
+        sub_850 = folder.newfolder(name=f"{tramo} — −850 mV ({H_850} m)")
+        ls_850 = sub_850.newlinestring(name=f"Criterio −850 mV")
+        ls_850.coords = _coords_flat(H_850)
         ls_850.altitudemode = simplekml.AltitudeMode.relativetoground
         ls_850.extrude = 0
         ls_850.style.linestyle.color = C_850
-        ls_850.style.linestyle.width = 2
+        ls_850.style.linestyle.width = 3
 
-        # -1200 mV (línea de referencia fija a 48 m)
-        sub_1200 = folder.newfolder(name=f"{tramo} — −1200 mV")
-        ls_1200 = sub_1200.newlinestring(name="Criterio −1200 mV")
-        ls_1200.coords = _coords_flat(48.0)
+        # -1200 mV (referencia fija a H_1200 m)
+        sub_1200 = folder.newfolder(name=f"{tramo} — −1200 mV ({H_1200} m)")
+        ls_1200 = sub_1200.newlinestring(name=f"Criterio −1200 mV")
+        ls_1200.coords = _coords_flat(H_1200)
         ls_1200.altitudemode = simplekml.AltitudeMode.relativetoground
         ls_1200.extrude = 0
         ls_1200.style.linestyle.color = C_1200
-        ls_1200.style.linestyle.width = 2
+        ls_1200.style.linestyle.width = 3
 
     buf = _io.BytesIO()
     kml.savekmz(buf)
@@ -2807,8 +2813,13 @@ def main():
         pbi_title("Exportar KMZ 3D para Google Earth")
         st.markdown(
             '<p style="font-size:0.82rem;color:#64748B;margin-bottom:0.8rem;">'
-            'Genera un archivo KMZ con las líneas ON y OFF elevadas según el potencial '
-            '(|mV| × 0.04 m), más las referencias de criterio −850 mV (34 m) y −1200 mV (48 m).'
+            'Genera un KMZ con líneas ON/OFF elevadas (|mV| × 0.2 m) y referencias '
+            '−850 mV a 170 m y −1200 mV a 240 m sobre el terreno.</p>'
+            '<p style="font-size:0.78rem;color:#D97706;margin-bottom:0.8rem;">'
+            '<b>Para ver el efecto 3D en Google Earth Pro:</b> abre el KMZ, luego '
+            'inclina la vista con <b>clic derecho + arrastrar hacia arriba</b>, '
+            'o usa el control de inclinación (barra vertical derecha). '
+            'La vista debe estar oblicua, no cenital.'
             '</p>', unsafe_allow_html=True)
 
         tramos_disp = {d["tramo"]: d for d in todos if
