@@ -1454,6 +1454,118 @@ def _badge(score):
     return '<span class="badge-bajo">BAJO</span>'
 
 
+def _generar_kmz_3d(tramos_data: list) -> bytes:
+    """
+    Genera un KMZ con visualización 3D para Google Earth siguiendo el estándar
+    de inspección CIPS: líneas ON/OFF elevadas por potencial + referencias -850/-1200 mV.
+
+    Altura = |potencial_mV| × 0.04 metros (relativeToGround).
+    -850 mV → 34 m fijos | -1200 mV → 48 m fijos.
+    Colores: ON azul #0c63dd, OFF verde #00ec00, -850 rojo #fd686b, -1200 rosa #ff7ec7.
+    """
+    import simplekml, io as _io
+
+    # KML usa AABBGGRR
+    C_ON   = "ffdd630c"   # #0c63dd azul, 100% opaco en puntos
+    C_OFF  = "ff00ec00"   # #00ec00 verde
+    C_850  = "ff6b68fd"   # #fd686b rojo-rosa
+    C_1200 = "ffc77eff"   # #ff7ec7 rosa
+    # Líneas ON/OFF al 20 % de opacidad (alpha 0x33)
+    CL_ON  = "33dd630c"
+    CL_OFF = "3300ec00"
+
+    MAX_PTS = 8000  # máx puntos por tramo para no sobrecargar GEP
+
+    kml = simplekml.Kml(name="CIPS 3D — PCC Integrity")
+
+    for d in tramos_data:
+        df = d["df"].copy()
+        tramo = d["tramo"]
+
+        # Filtrar GPS válidos dentro de Colombia
+        df = df.dropna(subset=["Lat_corr", "Long_corr"])
+        df = df[df["Lat_corr"].between(-5, 15) & df["Long_corr"].between(-82, -65)]
+        if df.empty:
+            continue
+
+        # Decimar si hay demasiados puntos
+        step = max(1, len(df) // MAX_PTS)
+        df = df.iloc[::step].reset_index(drop=True)
+
+        # Asegurar voltajes en mV
+        for col in ["On_mV_limpio", "Off_mV_limpio"]:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+                if df[col].dropna().abs().median() < 5:
+                    df[col] = df[col] * 1000
+
+        folder = kml.newfolder(name=tramo)
+
+        def _coords_3d(col):
+            rows = df[df[col].notna()]
+            return [(float(r.Long_corr), float(r.Lat_corr),
+                     round(abs(float(r[col])) * 0.04, 2))
+                    for _, r in rows.iterrows()]
+
+        def _coords_flat(h):
+            return [(float(r.Long_corr), float(r.Lat_corr), h)
+                    for _, r in df.iterrows()]
+
+        def _add_line(folder, name, coords, color_line, color_pt, width=3, pt_scale=0.4):
+            if len(coords) < 2:
+                return
+            sub = folder.newfolder(name=name)
+            ls = sub.newlinestring(name=name)
+            ls.coords = coords
+            ls.altitudemode = simplekml.AltitudeMode.relativetoground
+            ls.extrude = 0
+            ls.style.linestyle.color = color_line
+            ls.style.linestyle.width = width
+            # Puntos individuales (marca cada medición)
+            for coord in coords:
+                pnt = sub.newpoint()
+                pnt.coords = [coord]
+                pnt.altitudemode = simplekml.AltitudeMode.relativetoground
+                pnt.style.iconstyle.color = color_pt
+                pnt.style.iconstyle.scale = pt_scale
+                pnt.style.iconstyle.icon.href = \
+                    "http://maps.google.com/mapfiles/kml/shapes/shaded_dot.png"
+                pnt.style.labelstyle.scale = 0
+
+        # ON
+        if "On_mV_limpio" in df.columns:
+            _add_line(folder, f"{tramo} — ON",
+                      _coords_3d("On_mV_limpio"), CL_ON, C_ON)
+
+        # OFF
+        if "Off_mV_limpio" in df.columns:
+            _add_line(folder, f"{tramo} — OFF",
+                      _coords_3d("Off_mV_limpio"), CL_OFF, C_OFF)
+
+        # -850 mV (línea de referencia fija a 34 m)
+        sub_850 = folder.newfolder(name=f"{tramo} — −850 mV")
+        ls_850 = sub_850.newlinestring(name="Criterio −850 mV")
+        ls_850.coords = _coords_flat(34.0)
+        ls_850.altitudemode = simplekml.AltitudeMode.relativetoground
+        ls_850.extrude = 0
+        ls_850.style.linestyle.color = C_850
+        ls_850.style.linestyle.width = 2
+
+        # -1200 mV (línea de referencia fija a 48 m)
+        sub_1200 = folder.newfolder(name=f"{tramo} — −1200 mV")
+        ls_1200 = sub_1200.newlinestring(name="Criterio −1200 mV")
+        ls_1200.coords = _coords_flat(48.0)
+        ls_1200.altitudemode = simplekml.AltitudeMode.relativetoground
+        ls_1200.extrude = 0
+        ls_1200.style.linestyle.color = C_1200
+        ls_1200.style.linestyle.width = 2
+
+    buf = _io.BytesIO()
+    kml.savekmz(buf)
+    buf.seek(0)
+    return buf.read()
+
+
 def render_cips_comparativo(actual_list, historico_list):
     todos  = actual_list + historico_list
     n_act  = sum(len(d["df"]) for d in actual_list)
@@ -1731,6 +1843,37 @@ def render_cips_comparativo(actual_list, historico_list):
         rows_html += "</tbody></table></div>"
         st.markdown(rows_html, unsafe_allow_html=True)
 
+    # ── Exportar KMZ 3D ───────────────────────────────────────────────────────
+    divider()
+    pbi_title("Exportar KMZ 3D para Google Earth")
+    st.markdown(
+        '<p style="font-size:0.82rem;color:#64748B;margin-bottom:0.8rem;">'
+        'Genera un archivo KMZ con las líneas ON y OFF elevadas según el potencial '
+        '(|mV| × 0.04 m), más las referencias de criterio −850 mV (34 m) y −1200 mV (48 m).'
+        '</p>', unsafe_allow_html=True)
+
+    tramos_disp = {d["tramo"]: d for d in todos if
+                   "Lat_corr" in d["df"].columns and d["df"]["Lat_corr"].notna().sum() > 10}
+
+    if not tramos_disp:
+        st.info("No hay tramos con coordenadas GPS para exportar.")
+    else:
+        sel_tramos = st.multiselect(
+            "Tramos a incluir en el KMZ",
+            options=list(tramos_disp.keys()),
+            default=list(tramos_disp.keys()),
+            key="kmz3d_sel")
+
+        if sel_tramos and st.button("Generar KMZ 3D", key="btn_kmz3d", type="primary"):
+            with st.spinner("Generando KMZ…"):
+                kmz_bytes = _generar_kmz_3d([tramos_disp[t] for t in sel_tramos])
+            nombre_kmz = "CIPS_3D_" + "_".join(sel_tramos[:2]).replace(" ", "-") + ".kmz"
+            st.download_button(
+                "Descargar KMZ 3D",
+                data=kmz_bytes,
+                file_name=nombre_kmz,
+                mime="application/vnd.google-earth.kmz",
+                key="dl_kmz3d")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
