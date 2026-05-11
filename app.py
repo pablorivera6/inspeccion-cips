@@ -742,6 +742,28 @@ def _corregir_texto(texto):
     return "".join(resultado)
 
 
+@st.cache_data(show_spinner=False)
+def _cargar_lineas_ocensa():
+    import json as _json
+    ruta = os.path.join(os.path.dirname(__file__), "data", "ocensa_lineas.json")
+    if os.path.exists(ruta):
+        with open(ruta) as _f:
+            return _json.load(_f)
+    return {}
+
+
+def _linea_tramo(tramo: str):
+    """Retorna {lons, lats} del tramo OCENSA si existe, o None."""
+    lineas = _cargar_lineas_ocensa()
+    tramo_up = tramo.upper()
+    if tramo in lineas:
+        return lineas[tramo]
+    for key in lineas:
+        if key.upper() in tramo_up or tramo_up in key.upper():
+            return lineas[key]
+    return None
+
+
 def parse_abscisa(val):
     if pd.isna(val): return None
     s = str(val).strip().replace(" ", "")
@@ -1121,6 +1143,18 @@ def render_pap(d):
                 center = {"lat": mdf["Latitud"].mean(),
                           "lon": mdf["Longitud"].mean()}
                 zoom = 10
+
+            # Línea del ducto OCENSA
+            _linea = _linea_tramo(meta.get("tramo", ""))
+            if _linea:
+                fig.add_trace(go.Scattermapbox(
+                    lat=_linea["lats"], lon=_linea["lons"],
+                    mode="lines",
+                    line=dict(width=3, color="#FF6B00"),
+                    name="Ducto OCENSA",
+                    hoverinfo="skip",
+                    showlegend=True,
+                ))
 
             fig.update_layout(
                 margin=dict(t=0,b=0,l=0,r=0),
