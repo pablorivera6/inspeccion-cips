@@ -672,6 +672,53 @@ def load_cips_processed(file, categoria="ACTUAL"):
 # PAP / DCVG — Helpers
 # ══════════════════════════════════════════════════════════════════════════════
 
+import re as _re
+
+@st.cache_resource(show_spinner=False)
+def _get_spell():
+    try:
+        from spellchecker import SpellChecker
+        spell = SpellChecker(language="es", distance=2)
+        # Vocabulario técnico del dominio que no debe corregirse
+        spell.word_frequency.load_words([
+            "baquela", "bakelita", "borner", "bornera",
+            "abscisa", "abscisas", "abscisado", "absisado",
+            "cips", "dcvg", "pap", "tgi", "ocensa", "pcc",
+            "galvanica", "galvánica", "catodica", "catódica",
+            "catodico", "ducto", "ductos", "tramo", "tramos",
+            "potencial", "resistencia", "avispones", "cama",
+            "valvula", "válvula", "conforme", "conformes",
+            "nomenclatura", "nomenglatura", "cupiagua", "cusiana",
+            "prescencia",  # error frecuente aceptado en campo
+            "conección", "conexion", "terminales", "terminal",
+            "bornera", "cableado", "cableados",
+        ])
+        return spell
+    except Exception:
+        return None
+
+
+def _corregir_texto(texto):
+    """Corrige ortografía en español preservando términos técnicos y mayúsculas."""
+    if pd.isna(texto) or not str(texto).strip():
+        return texto
+    spell = _get_spell()
+    if spell is None:
+        return texto
+    tokens = _re.findall(
+        r"[A-Za-záéíóúÁÉÍÓÚüÜñÑ']+|[^A-Za-záéíóúÁÉÍÓÚüÜñÑ']+",
+        str(texto)
+    )
+    resultado = []
+    for tok in tokens:
+        if _re.match(r"^[A-Za-záéíóúÁÉÍÓÚüÜñÑ]{4,}$", tok) and not tok.isupper():
+            corrected = spell.correction(tok.lower())
+            if corrected and corrected != tok.lower():
+                tok = corrected.capitalize() if tok[0].isupper() else corrected
+        resultado.append(tok)
+    return "".join(resultado)
+
+
 def parse_abscisa(val):
     if pd.isna(val): return None
     s = str(val).strip().replace(" ", "")
@@ -755,6 +802,10 @@ def load_excel(file, pdf_urls=None):
         for p_name, p_url in pdf_urls.items():
             if submission_id in p_name:
                 pdf_url = p_url; break
+
+    for _col in ["Observaciones", "Comentario", "Comentarios"]:
+        if _col in df.columns:
+            df[_col] = df[_col].apply(_corregir_texto)
 
     return {"meta": meta, "df": df, "tipo": tipo, "pdf_url": pdf_url}
 
