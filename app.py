@@ -1030,9 +1030,9 @@ def render_pap(d):
         fig = px.pie(edo, values="Count", names="Estado",
                      color="Estado", color_discrete_map=ESTADO_COLORS, hole=0.55)
         fig.update_layout(
-            height=240, margin=dict(t=8, b=24, l=0, r=0),
+            height=300, margin=dict(t=8, b=90, l=0, r=0),
             paper_bgcolor="rgba(0,0,0,0)", showlegend=True,
-            legend=dict(orientation="v", x=0.5, xanchor="center", y=-0.12,
+            legend=dict(orientation="h", x=0.5, xanchor="center", y=-0.05,
                         font=dict(size=9, color="#475569"), bgcolor="rgba(0,0,0,0)"))
         fig.update_traces(textposition="inside", textinfo="percent",
                            hovertemplate="%{label}<br>%{value} pts (%{percent})<extra></extra>",
