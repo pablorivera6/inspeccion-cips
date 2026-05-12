@@ -2398,6 +2398,85 @@ def _sp_token():
 # Sidebar
 # ══════════════════════════════════════════════════════════════════════════════
 
+# ══════════════════════════════════════════════════════════════════════════════
+# AUTENTICACIÓN
+# ══════════════════════════════════════════════════════════════════════════════
+
+_LOG_PATH = "/tmp/pcc_login_log.csv"
+
+def _log_access(username: str, ok: bool):
+    import csv as _csv
+    nueva = not os.path.exists(_LOG_PATH)
+    with open(_LOG_PATH, "a", newline="", encoding="utf-8") as f:
+        w = _csv.DictWriter(f, fieldnames=["Fecha", "Usuario", "Resultado"])
+        if nueva:
+            w.writeheader()
+        w.writerow({
+            "Fecha":     __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "Usuario":   username,
+            "Resultado": "EXITOSO" if ok else "FALLIDO",
+        })
+
+def _render_login():
+    st.markdown("""
+    <style>
+      [data-testid="stSidebar"]   { display:none !important; }
+      [data-testid="stHeader"]    { display:none !important; }
+      .block-container { max-width:420px !important; margin:0 auto;
+                         padding-top:5rem !important; }
+    </style>""", unsafe_allow_html=True)
+
+    logo_b64 = ""
+    if os.path.exists("logo-pcc-hd.png"):
+        with open("logo-pcc-hd.png", "rb") as _f:
+            logo_b64 = base64.b64encode(_f.read()).decode()
+
+    st.markdown(f"""
+    <div style="text-align:center;margin-bottom:2.5rem;">
+      {'<img src="data:image/png;base64,' + logo_b64 + '" style="width:200px;margin-bottom:1.2rem;">' if logo_b64 else ''}
+      <div style="font-size:0.7rem;color:#94A3B8;letter-spacing:0.18em;
+                  font-weight:700;text-transform:uppercase;">
+        Dashboard de Inspecciones
+      </div>
+    </div>
+    <div style="background:white;border:1px solid #E2E8F0;border-radius:16px;
+                border-top:4px solid #D50032;padding:2rem 2rem 1.5rem;
+                box-shadow:0 4px 24px rgba(0,0,0,0.07);">
+    """, unsafe_allow_html=True)
+
+    with st.form("login_form", clear_on_submit=False):
+        st.markdown('<p style="font-size:1rem;font-weight:700;color:#0F172A;'
+                    'margin-bottom:1.2rem;">Iniciar sesión</p>',
+                    unsafe_allow_html=True)
+        usuario = st.text_input("Usuario", placeholder="usuario")
+        clave   = st.text_input("Contraseña", type="password", placeholder="••••••••")
+        entrar  = st.form_submit_button("Entrar", use_container_width=True, type="primary")
+
+        if entrar:
+            try:
+                usuarios = dict(st.secrets["auth"]["users"])
+            except Exception:
+                st.error("Credenciales no configuradas. Contacta al administrador.")
+                return
+
+            if usuario in usuarios and usuarios[usuario] == clave:
+                st.session_state["_auth_ok"]   = True
+                st.session_state["_auth_user"] = usuario
+                _log_access(usuario, True)
+                st.rerun()
+            else:
+                _log_access(usuario or "—", False)
+                st.error("Usuario o contraseña incorrectos")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+def _is_auth() -> bool:
+    return st.session_state.get("_auth_ok", False)
+
+def _current_user() -> str:
+    return st.session_state.get("_auth_user", "")
+
+
 def sidebar():
     with st.sidebar:
         # Logo
@@ -2421,6 +2500,16 @@ def sidebar():
               </div>
             </div>
             """, unsafe_allow_html=True)
+
+        # Usuario activo + logout
+        st.markdown(
+            f'<div style="font-size:0.72rem;color:#64748B;padding:0.4rem 0 0;">'
+            f'<span style="font-weight:600;color:#0F172A;">👤 {_current_user()}</span></div>',
+            unsafe_allow_html=True)
+        if st.button("Cerrar sesión", use_container_width=True, key="btn_logout"):
+            st.session_state["_auth_ok"]   = False
+            st.session_state["_auth_user"] = ""
+            st.rerun()
 
         st.markdown('<hr style="border-color:#E2E8F0;margin:0.5rem 0;">', unsafe_allow_html=True)
 
@@ -2590,6 +2679,21 @@ def sidebar():
                 st.session_state.pop("cips_files", None)
                 st.rerun()
 
+            # ── Registro de accesos (descarga) ──────────────────────────────
+            st.markdown('<hr style="border-color:#E2E8F0;margin:0.6rem 0;">',
+                        unsafe_allow_html=True)
+            st.markdown('<p style="font-size:0.65rem;font-weight:700;color:#94A3B8;'
+                        'letter-spacing:0.12em;margin-bottom:0.3rem;">REGISTRO</p>',
+                        unsafe_allow_html=True)
+            if os.path.exists(_LOG_PATH):
+                with open(_LOG_PATH, "rb") as _lf:
+                    st.download_button("Descargar registro de accesos", data=_lf.read(),
+                                       file_name="registro_accesos_pcc.csv",
+                                       mime="text/csv", use_container_width=True,
+                                       key="dl_log")
+            else:
+                st.caption("Sin registros aún.")
+
             return modo, None, None, None, None, (actual_list, historico_list)
 
 
@@ -2721,6 +2825,10 @@ def inject_loading_animation():
 # ══════════════════════════════════════════════════════════════════════════════
 
 def main():
+    if not _is_auth():
+        _render_login()
+        st.stop()
+
     inject_loading_animation()
     result = sidebar()
     modo   = result[0]
