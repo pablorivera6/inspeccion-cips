@@ -2402,21 +2402,6 @@ def _sp_token():
 # AUTENTICACIÓN
 # ══════════════════════════════════════════════════════════════════════════════
 
-_LOG_PATH = "/tmp/pcc_login_log.csv"
-
-def _log_access(username: str, ok: bool):
-    import csv as _csv
-    nueva = not os.path.exists(_LOG_PATH)
-    with open(_LOG_PATH, "a", newline="", encoding="utf-8") as f:
-        w = _csv.DictWriter(f, fieldnames=["Fecha", "Usuario", "Resultado"])
-        if nueva:
-            w.writeheader()
-        w.writerow({
-            "Fecha":     __import__("datetime").datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            "Usuario":   username,
-            "Resultado": "EXITOSO" if ok else "FALLIDO",
-        })
-
 def _render_login():
     st.markdown("""
     <style>
@@ -2462,10 +2447,8 @@ def _render_login():
             if usuario in usuarios and usuarios[usuario] == clave:
                 st.session_state["_auth_ok"]   = True
                 st.session_state["_auth_user"] = usuario
-                _log_access(usuario, True)
                 st.rerun()
             else:
-                _log_access(usuario or "—", False)
                 st.error("Usuario o contraseña incorrectos")
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -2678,21 +2661,6 @@ def sidebar():
                 fetch_cips_metadata.clear()
                 st.session_state.pop("cips_files", None)
                 st.rerun()
-
-            # ── Registro de accesos (descarga) ──────────────────────────────
-            st.markdown('<hr style="border-color:#E2E8F0;margin:0.6rem 0;">',
-                        unsafe_allow_html=True)
-            st.markdown('<p style="font-size:0.65rem;font-weight:700;color:#94A3B8;'
-                        'letter-spacing:0.12em;margin-bottom:0.3rem;">REGISTRO</p>',
-                        unsafe_allow_html=True)
-            if os.path.exists(_LOG_PATH):
-                with open(_LOG_PATH, "rb") as _lf:
-                    st.download_button("Descargar registro de accesos", data=_lf.read(),
-                                       file_name="registro_accesos_pcc.csv",
-                                       mime="text/csv", use_container_width=True,
-                                       key="dl_log")
-            else:
-                st.caption("Sin registros aún.")
 
             return modo, None, None, None, None, (actual_list, historico_list)
 
